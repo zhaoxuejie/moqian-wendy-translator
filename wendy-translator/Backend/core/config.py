@@ -4,7 +4,7 @@
 """
 
 import os
-from translation_service import translation_service
+from services.translation_service import translation_service
 
 class TranslationConfig:
     """翻译服务配置类"""

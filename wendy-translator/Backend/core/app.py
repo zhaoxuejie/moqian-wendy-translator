@@ -15,21 +15,24 @@ import hashlib
 import requests
 import time
 from functools import wraps
-from translation_service import translation_service
-from config import translation_config
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from services.translation_service import translation_service
+from core.config import translation_config
 
-app = Flask(__name__, static_folder='../Frontend', static_url_path='')
+app = Flask(__name__, static_folder='../../frontend', static_url_path='')
 CORS(app)  # 允许跨域请求
 
 # 配置
 import os
-DATABASE = os.path.join(os.path.dirname(__file__), 'wendy_translator.db')
+DATABASE = os.path.join(os.path.dirname(__file__), '../database/wendy_translator.db')
 SECRET_KEY = 'wendy-translator-secret-key-2024'
 
 # 配置翻译API
 try:
     # 优先配置有道翻译API
-    from configure_youdao_api import YOUDAO_APP_KEY, YOUDAO_APP_SECRET
+    from services.configure_youdao_api import YOUDAO_APP_KEY, YOUDAO_APP_SECRET
     translation_service.set_youdao_config(YOUDAO_APP_KEY, YOUDAO_APP_SECRET)
     print("✅ 有道翻译API已配置")
 except ImportError:
@@ -38,7 +41,7 @@ except Exception as e:
     print(f"⚠️  有道翻译API配置失败: {e}")
     print("🔄 尝试配置百度翻译API...")
     try:
-        from configure_api import BAIDU_APPID, BAIDU_SECRET
+        from services.configure_api import BAIDU_APPID, BAIDU_SECRET
         translation_service.set_baidu_config(BAIDU_APPID, BAIDU_SECRET)
         print("✅ 百度翻译API已配置")
     except ImportError:
@@ -97,12 +100,12 @@ def handle_errors(f):
 @app.route('/')
 def index():
     """返回主页"""
-    return send_from_directory('../Frontend', 'index.html')
+    return send_from_directory('../../frontend', 'index.html')
 
 @app.route('/<path:filename>')
 def static_files(filename):
     """提供静态文件服务"""
-    return send_from_directory('../Frontend', filename)
+    return send_from_directory('../../frontend', filename)
 
 # ====== 用户管理 API ======
 @app.route('/api/user/profile', methods=['GET'])

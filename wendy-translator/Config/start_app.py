@@ -150,10 +150,10 @@ def main():
     
     # 检查必要文件
     required_files = [
-        'Backend/app.py', 
-        'Backend/database_init.py', 
-        'Frontend/index.html', 
-        'Frontend/api.js'
+        'backend/core/app.py', 
+        'backend/database/database_init.py', 
+        'frontend/index.html', 
+        'frontend/api.js'
     ]
     missing_files = [f for f in required_files if not os.path.exists(f)]
     if missing_files:
