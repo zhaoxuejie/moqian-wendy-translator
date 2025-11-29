@@ -1,5 +1,5 @@
 {
-  "api_key": "YOUR_DEEPSEEK_API_KEY_HERE",
+  "api_key": "sk-34f38a43cd194156993c348cb8470b85",
   "base_url": "https://api.deepseek.com/v1",
   "model": "deepseek-chat",
   "max_tokens": 2000,

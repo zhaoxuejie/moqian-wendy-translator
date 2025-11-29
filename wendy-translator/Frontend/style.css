@@ -84,7 +84,8 @@ body {
     opacity: 0.9;
 }
 
-.assistant {
+/* 头像助手样式 - 重命名避免与聊天消息冲突 */
+.header-assistant {
     position: absolute;
     top: 20px;
     right: 20px;
@@ -101,7 +102,7 @@ body {
     overflow: hidden;
 }
 
-.assistant img {
+.header-assistant img {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -327,6 +328,27 @@ body {
 
 .chat-message.assistant {
     flex-direction: row;
+}
+
+.message-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.chat-message.user .message-avatar {
+    background-color: var(--primary);
+    color: white;
+}
+
+.chat-message.assistant .message-avatar {
+    background-color: #f0f0f0;
+    color: var(--primary);
 }
 
 .message-content {

@@ -730,34 +730,45 @@ class WendyApp {
         const chatInput = document.getElementById('chat-input');
         const message = chatInput.value.trim();
         
+        console.log('🤖 开始AI对话处理');
+        console.log('📝 用户消息:', message);
+        
         if (!message) {
+            console.log('❌ 消息为空');
             this.showNotification('请输入要问的问题', 'warning');
             return;
         }
 
         // 显示用户消息
+        console.log('💬 添加用户消息到界面');
         this.addChatMessage(message, 'user');
         
         // 清空输入框
         chatInput.value = '';
         
         try {
+            console.log('📡 发送API请求...');
             // 显示加载状态
             this.addChatMessage('正在思考中...', 'assistant', true);
             
             const response = await this.api.chatWithAI(message);
             
+            console.log('📥 收到API响应:', response);
+            
             // 移除加载消息
             this.removeLoadingMessage();
             
             if (response.success) {
+                console.log('✅ API调用成功');
+                console.log('💬 AI回复长度:', response.response ? response.response.length : 0);
                 this.addChatMessage(response.response, 'assistant');
             } else {
+                console.log('❌ API调用失败:', response.error);
                 this.addChatMessage('抱歉，我现在无法回答这个问题。请稍后再试。', 'assistant');
             }
         } catch (error) {
             this.removeLoadingMessage();
-            console.error('AI对话失败:', error);
+            console.error('💥 AI对话异常:', error);
             this.addChatMessage('抱歉，网络连接出现问题。请检查网络后重试。', 'assistant');
         }
     }
@@ -812,14 +823,25 @@ class WendyApp {
             messageDiv.className += ' loading';
         }
         
+        // 添加头像（适配CSS的flex布局）
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        if (sender === 'user') {
+            avatar.innerHTML = '<i class="fas fa-user"></i>';
+        } else {
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        }
+        
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
         messageContent.textContent = content;
         
+        messageDiv.appendChild(avatar);
         messageDiv.appendChild(messageContent);
         chatMessages.appendChild(messageDiv);
         
-        // 滚动到底部
+        // 强制重新渲染后滚动到底部
+        messageDiv.offsetHeight;
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 

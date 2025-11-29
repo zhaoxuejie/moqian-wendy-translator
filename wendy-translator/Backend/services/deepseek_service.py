@@ -75,7 +75,12 @@ class DeepSeekService:
         Returns:
             包含回复结果的字典
         """
+        print(f"🤖 DeepSeek API调用开始")
+        print(f"📝 用户消息: {message}")
+        print(f"📚 上下文: {context}")
+        
         if not self.config.is_configured():
+            print("❌ DeepSeek API未配置")
             return {
                 'success': False,
                 'error': 'DeepSeek API未配置',
@@ -83,8 +88,11 @@ class DeepSeekService:
             }
         
         try:
+            print(f"🔧 配置信息: 模型={self.config.model}, base_url={self.config.base_url}")
+            
             # 构建系统提示词
             system_prompt = self._build_system_prompt(context)
+            print(f"💭 系统提示词长度: {len(system_prompt)} 字符")
             
             # 构建请求数据
             payload = {
@@ -97,6 +105,9 @@ class DeepSeekService:
                 "temperature": self.config.temperature
             }
             
+            print(f"📤 发送请求到: {self.config.base_url}/chat/completions")
+            print(f"📋 请求参数: model={self.config.model}, max_tokens={self.config.max_tokens}, temperature={self.config.temperature}")
+            
             # 发送请求
             response = requests.post(
                 f"{self.config.base_url}/chat/completions",
@@ -105,35 +116,54 @@ class DeepSeekService:
                 timeout=30
             )
             
+            print(f"📥 响应状态码: {response.status_code}")
+            
             if response.status_code == 200:
                 data = response.json()
                 ai_response = data['choices'][0]['message']['content']
+                usage = data.get('usage', {})
+                
+                print(f"✅ API调用成功")
+                print(f"💬 AI回复长度: {len(ai_response)} 字符")
+                print(f"📊 Token使用: {usage}")
+                print(f"🎯 回复预览: {ai_response[:100]}...")
+                
                 return {
                     'success': True,
                     'response': ai_response,
                     'model': self.config.model,
-                    'usage': data.get('usage', {})
+                    'usage': usage
                 }
             else:
                 error_msg = f"API请求失败: {response.status_code}"
+                print(f"❌ API错误响应: {response.text}")
+                
                 try:
                     error_data = response.json()
-                    error_msg += f" - {error_data.get('error', {}).get('message', '未知错误')}"
+                    error_detail = error_data.get('error', {}).get('message', '未知错误')
+                    error_msg += f" - {error_detail}"
+                    print(f"❌ 错误详情: {error_detail}")
                 except:
-                    pass
+                    error_msg += " - 响应解析失败"
+                    print("❌ 无法解析错误响应")
+                
                 return {
                     'success': False,
                     'error': error_msg,
                     'response': '抱歉，AI服务暂时出现问题，请稍后再试。'
                 }
                 
-        except requests.Timeout:
+        except requests.Timeout as e:
+            print(f"⏰ 请求超时异常: {e}")
             return {
                 'success': False,
                 'error': '请求超时',
                 'response': '抱歉，AI响应超时，请稍后再试。'
             }
         except Exception as e:
+            print(f"💥 未预期的异常: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'error': f'服务异常: {str(e)}',

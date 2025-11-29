@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import os
+import os
 import json
 from datetime import datetime, date
 import hashlib
@@ -108,7 +109,22 @@ def index():
 @app.route('/<path:filename>')
 def static_files(filename):
     """提供静态文件服务"""
-    return send_from_directory('../../frontend', filename)
+    # 首先尝试从frontend目录提供文件
+    frontend_path = f'../../frontend/{filename}'
+    if os.path.exists(frontend_path):
+        return send_from_directory('../../frontend', filename)
+    
+    # 然后尝试从项目根目录提供文件（用于测试文件）
+    root_path = f'../../{filename}'
+    if os.path.exists(root_path):
+        return send_from_directory('../..', filename)
+    
+    # 最后尝试从backend目录提供文件
+    backend_path = f'../../{filename}'
+    if os.path.exists(backend_path):
+        return send_from_directory('../..', filename)
+    
+    return f'File not found: {filename}', 404
 
 # ====== 用户管理 API ======
 @app.route('/api/user/profile', methods=['GET'])
@@ -554,25 +570,54 @@ def check_achievement(user_id, achievement_type, achievement_name, achievement_d
 @handle_errors
 def chat_with_ai():
     """AI对话接口"""
-    data = request.get_json()
-    message = data.get('message', '').strip()
-    context = data.get('context', '')
-    username = data.get('username', 'wendy')
+    print("🚀 收到AI对话请求")
     
-    if not message:
-        return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
-    
-    # 调用DeepSeek服务
-    result = deepseek_service.chat(message, context)
-    
-    # 记录对话历史（可选）
-    if result.get('success'):
-        user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
-        if user:
-            # 这里可以添加对话历史记录功能
-            pass
-    
-    return jsonify(result)
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        context = data.get('context', '')
+        username = data.get('username', 'wendy')
+        
+        print(f"📋 请求参数:")
+        print(f"   - 用户: {username}")
+        print(f"   - 消息: {message}")
+        print(f"   - 上下文: {context}")
+        
+        if not message:
+            print("❌ 消息内容为空")
+            return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
+        
+        print("📞 调用DeepSeek服务...")
+        
+        # 调用DeepSeek服务
+        result = deepseek_service.chat(message, context)
+        
+        print(f"📝 DeepSeek服务返回:")
+        print(f"   - 成功: {result.get('success')}")
+        if result.get('success'):
+            print(f"   - 回复长度: {len(result.get('response', ''))}")
+        else:
+            print(f"   - 错误: {result.get('error')}")
+        
+        # 记录对话历史（可选）
+        if result.get('success'):
+            user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+            if user:
+                # 这里可以添加对话历史记录功能
+                print(f"💾 用户ID: {user['id']}，可以记录对话历史")
+        
+        print("🎯 返回API响应")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"💥 对话API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}',
+            'response': '抱歉，对话服务出现异常，请稍后再试。'
+        })
 
 # 启动服务器
 if __name__ == '__main__':
