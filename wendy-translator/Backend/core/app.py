@@ -29,6 +29,9 @@ import os
 DATABASE = os.path.join(os.path.dirname(__file__), '../database/wendy_translator.db')
 SECRET_KEY = 'wendy-translator-secret-key-2024'
 
+# 导入DeepSeek服务
+from services.deepseek_service import deepseek_service
+
 # 配置翻译API
 try:
     # 优先配置有道翻译API
@@ -545,6 +548,31 @@ def check_achievement(user_id, achievement_type, achievement_name, achievement_d
         
         return True
     return False
+
+# ====== AI对话 API ======
+@app.route('/api/chat', methods=['POST'])
+@handle_errors
+def chat_with_ai():
+    """AI对话接口"""
+    data = request.get_json()
+    message = data.get('message', '').strip()
+    context = data.get('context', '')
+    username = data.get('username', 'wendy')
+    
+    if not message:
+        return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
+    
+    # 调用DeepSeek服务
+    result = deepseek_service.chat(message, context)
+    
+    # 记录对话历史（可选）
+    if result.get('success'):
+        user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+        if user:
+            # 这里可以添加对话历史记录功能
+            pass
+    
+    return jsonify(result)
 
 # 启动服务器
 if __name__ == '__main__':

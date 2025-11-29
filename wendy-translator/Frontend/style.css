@@ -33,16 +33,18 @@
     --primary: #b399ff;
     --secondary: #d9cfff;
     --accent: #ffcc99;
+    --shadow: rgba(179, 153, 255, 0.2);
 }
 
 .theme-green {
     --primary: #7fdb9e;
     --secondary: #c1f0d2;
     --accent: #ff9e7f;
+    --shadow: rgba(127, 219, 158, 0.2);
 }
 
 body {
-    background: linear-gradient(135deg, #ffe6f2 0%, #fff0f7 100%);
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--light) 100%);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -183,19 +185,19 @@ body {
     background: linear-gradient(135deg, var(--primary) 0%, #ff7eb3 100%);
     color: white;
     border: none;
-    border-radius: 50px;
-    padding: 15px;
-    font-size: 18px;
+    border-radius: 25px;
+    padding: 10px 20px;
+    font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 5px 15px var(--shadow);
+    box-shadow: 0 3px 10px var(--shadow);
     transition: all 0.3s;
     margin-top: 10px;
 }
 
 .translate-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 20px var(--shadow);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--shadow);
 }
 
 .result-section {
@@ -250,16 +252,308 @@ body {
     color: var(--primary);
 }
 
+.word-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .word-image {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     background-color: var(--secondary);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     justify-content: center;
     align-items: center;
     margin: 10px auto;
-    font-size: 30px;
+    font-size: 24px;
+    box-shadow: 0 3px 10px var(--shadow);
+    transition: all 0.3s ease;
+}
+
+.word-image:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--shadow);
+}
+
+.deepseek-chat {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--primary) 0%, #ff7eb3 100%);
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 10px auto;
+    box-shadow: 0 3px 10px var(--shadow);
+}
+
+.deepseek-chat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--shadow);
+}
+
+/* 对话页面样式 */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+}
+
+.chat-messages {
+    flex: 1;
+    background-color: var(--light);
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 15px;
+    overflow-y: auto;
+    border: 2px solid var(--accent);
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+.chat-message.user {
+    flex-direction: row-reverse;
+}
+
+.chat-message.assistant {
+    flex-direction: row;
+}
+
+.message-content {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.chat-message.user .message-content {
+    background-color: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message.assistant .message-content {
+    background-color: white;
+    color: var(--text);
+    border: 1px solid var(--shadow);
+    border-bottom-left-radius: 4px;
+}
+
+.chat-btn {
+    display: block;
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary) 0%, #ff7eb3 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 3px 10px var(--shadow);
+    transition: all 0.3s;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.chat-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--shadow);
+}
+
+/* 我的单词区块样式 */
+.my-words-section {
+    background-color: var(--light);
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 2px solid var(--accent);
+}
+
+.my-words-section h3 {
+    color: var(--primary);
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.mastered-words {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.mastered-word-item {
+    background-color: white;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid var(--secondary);
+    font-size: 14px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mastered-word-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+.mastered-word-item .word-pronunciation {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+}
+
+.mastered-word-item .word-meaning {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 4px;
+}
+
+/* 单词本朗读图标样式 */
+.word-item-speak {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.word-item:hover .word-item-speak {
+    opacity: 1;
+}
+
+.word-item-speak:hover {
+    background-color: var(--primary);
+    transform: scale(1.1);
+}
+
+/* 分页控件样式 */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 15px;
+}
+
+.pagination-btn {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background-color: var(--secondary);
+    transform: translateY(-2px);
+}
+
+.pagination-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.page-info {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text);
+    min-width: 60px;
+    text-align: center;
+}
+
+/* 单词项样式更新 */
+.word-item {
+    background-color: white;
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.word-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.word-item .word {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--primary);
+    margin-bottom: 5px;
+}
+
+.word-item .pronunciation {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+    font-style: italic;
+}
+
+.word-item .meaning {
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
+.word-item .stars {
+    display: flex;
+    gap: 5px;
+    font-size: 16px;
+}
+
+.word-item .star {
+    cursor: pointer;
+    color: #ddd;
+    transition: color 0.2s ease;
+}
+
+.word-item .star.filled {
+    color: #ffd700;
+}
+
+.word-item .star:hover {
+    color: #ffd700;
+    transform: scale(1.1);
 }
 
 .example-sentence {

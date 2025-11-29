@@ -40,7 +40,7 @@ def init_database():
     """初始化数据库"""
     print("💾 初始化数据库...")
     try:
-        subprocess.check_call([sys.executable, "Backend/database_init.py"])
+        subprocess.check_call([sys.executable, "backend/database/database_init.py"])
         print("✅ 数据库初始化完成")
         return True
     except subprocess.CalledProcessError as e:
@@ -51,12 +51,12 @@ def configure_translation_api():
     """配置翻译API"""
     print("🔧 配置翻译API...")
     try:
-        # 切换到Backend目录
-        backend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Backend")
+        # 切换到backend/services目录
+        services_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend/services")
         
         # 运行API配置脚本
         result = subprocess.run([sys.executable, "configure_api.py"], 
-                              cwd=backend_dir, 
+                              cwd=services_dir, 
                               capture_output=True, 
                               text=True)
         
@@ -78,7 +78,7 @@ def start_backend():
     try:
         # 在新线程中启动Flask应用
         def run_flask():
-            subprocess.call([sys.executable, "Backend/app.py"])
+            subprocess.call([sys.executable, "backend/core/app.py"])
         
         flask_thread = threading.Thread(target=run_flask)
         flask_thread.daemon = True
@@ -121,7 +121,8 @@ def show_app_info():
     print("")
     print("🔧 功能特性:")
     print("   - ✅ 英中翻译")
-    print("   - ✅ 单词本管理")
+    print("   - ✅ AI对话助手")
+    print("   - ✅ 单词本管理（支持分页）")
     print("   - ✅ 学习进度跟踪")
     print("   - ✅ 个性化设置")
     print("   - ✅ 语音朗读")
@@ -129,6 +130,7 @@ def show_app_info():
     print("")
     print("💡 使用提示:")
     print("   - 输入英文单词进行翻译")
+    print("   - 使用AI对话功能深度学习")
     print("   - 点击麦克风模拟语音输入")
     print("   - 点击相机模拟图片识别")
     print("   - 将单词添加到单词本进行学习")
