@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS修复测试 - 聊天消息显示</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-pink">
+    <div class="app-container">
+        <div class="header">
+            <div class="header-assistant" id="assistant">
+                <img src="img/kenan.jpg" alt="柯南头像" id="assistant-avatar">
+            </div>
+            <h1>聊天消息测试</h1>
+            <p>测试CSS修复效果</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="welcome-message">
+                        <p>测试开始：检查聊天消息是否正常显示</p>
+                    </div>
+                    
+                    <!-- 用户消息 -->
+                    <div class="chat-message user">
+                        <div class="message-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="message-content">
+                            你好，我想学习英语单词"apple"
+                        </div>
+                    </div>
+                    
+                    <!-- AI助手回复 -->
+                    <div class="chat-message assistant">
+                        <div class="message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            "Apple"是苹果的意思！这是一个很常见的单词。发音是/ˈæp.əl/。你可以这样记住它：A red apple is delicious.（红苹果很好吃。）
+                        </div>
+                    </div>
+                    
+                    <!-- 更多测试消息 -->
+                    <div class="chat-message user">
+                        <div class="message-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="message-content">
+                            能给我举个例子吗？
+                        </div>
+                    </div>
+                    
+                    <div class="chat-message assistant">
+                        <div class="message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            当然可以！这里有几个例子：
+                            1. I eat an apple every day.（我每天吃一个苹果。）
+                            2. The apple tree is in our garden.（苹果树在我们的花园里。）
+                            3. An apple a day keeps the doctor away.（一天一苹果，医生远离我。）
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="input-section">
+                    <div class="input-area">
+                        <textarea placeholder="在这里输入你的问题..." id="chat-input"></textarea>
+                    </div>
+                    <button class="chat-btn" id="test-btn">测试消息显示</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 测试动态添加消息
+        document.getElementById('test-btn').addEventListener('click', function() {
+            const input = document.getElementById('chat-input');
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert('请输入测试消息内容');
+                return;
+            }
+            
+            // 添加用户消息
+            addTestMessage(content, 'user');
+            
+            // 模拟AI回复
+            setTimeout(() => {
+                addTestMessage('这是对"' + content + '"的AI回复内容。消息应该正常显示在聊天区域，而不是浮动到右上角。', 'assistant');
+            }, 1000);
+            
+            input.value = '';
+        });
+        
+        function addTestMessage(content, sender) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            
+            // 添加头像
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            if (sender === 'user') {
+                avatar.innerHTML = '<i class="fas fa-user"></i>';
+            } else {
+                avatar.innerHTML = '<i class="fas fa-robot"></i>';
+            }
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            chatMessages.appendChild(messageDiv);
+            
+            // 滚动到底部
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // 检查CSS样式
+        console.log('🔍 检查CSS样式冲突...');
+        
+        // 检查.assistant选择器是否还存在
+        const assistantElements = document.querySelectorAll('.assistant');
+        console.log('📊 找到.assistant元素:', assistantElements.length, '个');
+        
+        // 检查.header-assistant选择器
+        const headerAssistantElements = document.querySelectorAll('.header-assistant');
+        console.log('📊 找到.header-assistant元素:', headerAssistantElements.length, '个');
+        
+        // 检查聊天消息的样式
+        const chatMessages = document.querySelectorAll('.chat-message.assistant');
+        console.log('📊 聊天中的assistant消息:', chatMessages.length, '个');
+        
+        // 获取计算样式
+        if (chatMessages.length > 0) {
+            const firstAssistantMessage = chatMessages[0];
+            const computedStyle = window.getComputedStyle(firstAssistantMessage);
+            console.log('🎨 assistant消息的position属性:', computedStyle.position);
+            console.log('🎨 assistant消息的top属性:', computedStyle.top);
+            console.log('🎨 assistant消息的right属性:', computedStyle.right);
+        }
+        
+        console.log('✅ CSS修复测试页面加载完成');
+    </script>
+</body>
+</html>

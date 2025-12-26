@@ -10,7 +10,7 @@
 <body class="theme-pink">
     <div class="app-container">
         <div class="header">
-            <div class="assistant" id="assistant">
+            <div class="header-assistant" id="assistant">
                 <img src="img/kenan.jpg" alt="柯南头像" id="assistant-avatar">
             </div>
             <h1 id="app-title">温蒂的翻译助手</h1>
@@ -74,6 +74,7 @@
             
             <div class="tabs">
                 <div class="tab active" data-tab="translate"><span id="translate-tab-text">翻译</span></div>
+                <div class="tab" data-tab="chat"><span id="chat-tab-text">对话</span></div>
                 <div class="tab" data-tab="wordbook"><span id="wordbook-tab-text">单词本</span></div>
                 <div class="tab" data-tab="progress"><span id="progress-tab-text">成长记录</span></div>
             </div>
@@ -100,8 +101,13 @@
                 <div class="result-section" id="translation-result">
                     <div class="result-header">
                         <h3 id="result-title">翻译结果</h3>
-                        <div class="word-image">
-                            <i class="fas fa-apple-alt"></i>
+                        <div class="word-actions">
+                            <div class="word-image">
+                                <i class="fas fa-apple-alt"></i>
+                            </div>
+                            <div class="deepseek-chat" id="deepseek-chat-btn" title="使用AI助手深度学习">
+                                <i class="fas fa-robot"></i>
+                            </div>
                         </div>
                     </div>
                     <div class="result-content">
@@ -123,6 +129,34 @@
                 </div>
             </div>
             
+            <div class="tab-content" id="chat-tab">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <p id="chat-welcome-text">你好，温蒂！我是你的AI学习助手，有什么问题都可以问我哦！</p>
+                        </div>
+                    </div>
+                    
+                    <div class="input-section">
+                        <div class="input-area">
+                            <textarea placeholder="在这里输入或说出你想问的问题..." id="chat-input"></textarea>
+                            <div class="input-options">
+                                <div class="option-btn active" data-input="text">
+                                    <i class="fas fa-keyboard"></i>
+                                </div>
+                                <div class="option-btn" data-input="voice">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                                <div class="option-btn" data-input="camera">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="chat-btn" id="chat-btn">开始对话 <i class="fas fa-robot"></i></button>
+                    </div>
+                </div>
+            </div>
+            
             <div class="tab-content" id="wordbook-tab">
                 <div class="wordbook" id="wordbook-container">
                     <!-- 单词将通过JavaScript动态生成 -->
@@ -139,6 +173,13 @@
             </div>
             
             <div class="tab-content" id="progress-tab">
+                <div class="my-words-section">
+                    <h3 id="my-words-title">我的单词</h3>
+                    <div class="mastered-words" id="mastered-words">
+                        <!-- 已掌握的单词将在这里动态显示 -->
+                    </div>
+                </div>
+                
                 <div class="milestone">
                     <h3 id="progress-title">成长记录</h3>
                     <p><i class="fas fa-trophy"></i> <span id="streak-text">连续学习 7 天</span></p>
@@ -177,6 +218,7 @@
                 appSubtitle: "小语随时为你服务！",
                 welcomeText: "你好，温蒂！今天想学习什么有趣的单词呢？",
                 translateTab: "翻译",
+                chatTab: "对话",
                 wordbookTab: "单词本",
                 progressTab: "成长记录",
                 translateInput: "在这里输入或说出你想翻译的词语...",
@@ -186,6 +228,7 @@
                 milestoneTitle: "学习里程碑",
                 nextTargetText: "下一个目标：50个单词",
                 progressTitle: "成长记录",
+                chatWelcomeText: "你好，温蒂！我是你的AI学习助手，有什么问题都可以问我哦！",
                 encouragementText: "亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！",
                 footerText: "专为温蒂打造 • 充满爱的学习助手",
                 congratulationTitle: "恭喜！",

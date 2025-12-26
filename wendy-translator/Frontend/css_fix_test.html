@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS修复测试</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { 
+            padding: 20px; 
+            font-family: Arial, sans-serif;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+        .chat-container {
+            height: 300px;
+            border: 2px solid #4CAF50;
+            border-radius: 15px;
+            padding: 15px;
+            background: white;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .debug-info {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 CSS修复测试</h1>
+        
+        <div class="section">
+            <h3>测试1: 标准消息结构</h3>
+            <div class="chat-container">
+                <div class="chat-messages">
+                    <div class="chat-message assistant">
+                        <div class="message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            这是标准结构的AI消息，应该能正常显示。
+                        </div>
+                    </div>
+                    
+                    <div class="chat-message user">
+                        <div class="message-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="message-content">
+                            这是标准结构的用户消息。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>测试2: 检查CSS变量</h3>
+            <div id="css-vars-check"></div>
+        </div>
+
+        <div class="section">
+            <h3>测试3: 主题切换测试</h3>
+            <button onclick="changeTheme('pink')">粉色主题</button>
+            <button onclick="changeTheme('blue')">蓝色主题</button>
+            <button onclick="changeTheme('purple')">紫色主题</button>
+            <button onclick="changeTheme('green')">绿色主题</button>
+            <button onclick="changeTheme('')">清除主题</button>
+            <div id="theme-info"></div>
+        </div>
+    </div>
+
+    <script>
+        function checkCSSVariables() {
+            const checkDiv = document.getElementById('css-vars-check');
+            
+            const testElement = document.createElement('div');
+            testElement.className = 'message-content';
+            document.body.appendChild(testElement);
+            
+            const computedStyle = window.getComputedStyle(testElement);
+            const variables = {
+                '--primary': getComputedStyle(document.documentElement).getPropertyValue('--primary'),
+                '--text': getComputedStyle(document.documentElement).getPropertyValue('--text'),
+                '--shadow': getComputedStyle(document.documentElement).getPropertyValue('--shadow'),
+                '实际背景': computedStyle.backgroundColor,
+                '实际颜色': computedStyle.color,
+                '实际边框': computedStyle.borderColor
+            };
+            
+            document.body.removeChild(testElement);
+            
+            let html = '<div class="debug-info"><strong>CSS变量检查:</strong><br>';
+            for (const [key, value] of Object.entries(variables)) {
+                const isEmpty = !value || value.trim() === '';
+                html += `${key}: ${isEmpty ? '(空值)' : value.trim()} ${isEmpty ? '❌' : '✅'}<br>`;
+            }
+            html += '</div>';
+            
+            checkDiv.innerHTML = html;
+        }
+
+        function changeTheme(theme) {
+            document.body.className = theme ? `theme-${theme}` : '';
+            
+            const themeDiv = document.getElementById('theme-info');
+            themeDiv.innerHTML = `<div class="debug-info">当前主题: ${theme || '无主题'}</div>`;
+            
+            // 重新检查CSS变量
+            setTimeout(checkCSSVariables, 100);
+        }
+
+        function testMessageVisibility() {
+            const messages = document.querySelectorAll('.chat-message');
+            console.log('消息可见性检查:');
+            messages.forEach((msg, index) => {
+                const isVisible = msg.offsetHeight > 0;
+                const content = msg.querySelector('.message-content').textContent.substring(0, 20);
+                console.log(`消息${index + 1}: "${content}..." - ${isVisible ? '✅ 可见' : '❌ 不可见'}`);
+            });
+        }
+
+        // 页面加载完成后检查
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 CSS修复测试页面加载完成');
+            
+            // 检查CSS变量
+            checkCSSVariables();
+            
+            // 检查消息可见性
+            setTimeout(testMessageVisibility, 100);
+            
+            // 检查当前主题
+            changeTheme('pink'); // 应用默认主题
+            
+            console.log('💡 切换主题查看消息显示效果');
+        });
+    </script>
+</body>
+</html>

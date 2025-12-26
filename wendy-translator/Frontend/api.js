@@ -103,6 +103,18 @@ class WendyAPI {
     async getAchievements() {
         return await this.request(`/api/achievements?username=${this.username}`);
     }
+
+    // ====== AI对话功能 ======
+    async chatWithAI(message, context = '') {
+        return await this.request('/api/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: this.username,
+                message: message,
+                context: context
+            })
+        });
+    }
 }
 
 // 创建全局API实例
@@ -225,9 +237,30 @@ class WendyApp {
             this.simulateVoiceInput();
         });
 
+        // 对话按钮
+        const chatBtn = document.getElementById('chat-btn');
+        if (chatBtn) {
+            chatBtn.addEventListener('click', () => this.handleChat());
+        }
+
+        // DeepSeek对话按钮
+        const deepseekChatBtn = document.getElementById('deepseek-chat-btn');
+        if (deepseekChatBtn) {
+            deepseekChatBtn.addEventListener('click', () => this.handleDeepSeekChat());
+        }
+
         // 相机输入
         document.querySelector('[data-input="camera"]').addEventListener('click', () => {
             this.simulateCameraInput();
+        });
+
+        // 页签切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const tabElement = e.currentTarget;
+                const tabName = tabElement.getAttribute('data-tab');
+                this.switchToTab(tabName);
+            });
         });
     }
 
@@ -330,13 +363,34 @@ class WendyApp {
         const wordbookContainer = document.getElementById('wordbook-container');
         if (!wordbookContainer) return;
 
+        // 过滤已掌握的单词（3星）
+        const activeWords = this.wordDatabase.filter(word => word.mastery_level < 3);
+        
+        // 分页设置
+        const wordsPerPage = 9;
+        this.currentPage = this.currentPage || 1;
+        const totalPages = Math.ceil(activeWords.length / wordsPerPage);
+        
+        // 确保当前页有效
+        if (this.currentPage > totalPages) this.currentPage = totalPages || 1;
+        
+        // 计算当前页的单词
+        const startIndex = (this.currentPage - 1) * wordsPerPage;
+        const endIndex = startIndex + wordsPerPage;
+        const currentWords = activeWords.slice(startIndex, endIndex);
+
         wordbookContainer.innerHTML = '';
 
-        this.wordDatabase.forEach((word, index) => {
+        // 渲染当前页的单词
+        currentWords.forEach((word, index) => {
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
             wordItem.innerHTML = `
+                <div class="word-item-speak" data-word="${word.english_word}" title="朗读">
+                    <i class="fas fa-volume-up"></i>
+                </div>
                 <div class="word">${word.english_word}</div>
+                <div class="pronunciation">${word.pronunciation || ''}</div>
                 <div class="meaning">${word.chinese_meaning}</div>
                 <div class="stars" data-word-id="${word.id}">
                     ${this.getStarsHTML(word.mastery_level)}
@@ -345,7 +399,57 @@ class WendyApp {
             wordbookContainer.appendChild(wordItem);
         });
 
-        // 添加星星点击事件
+        // 添加分页控件
+        if (totalPages > 1) {
+            this.addPaginationControls(wordbookContainer, totalPages);
+        }
+
+        // 添加事件监听器
+        this.addWordbookEventListeners();
+        
+        // 更新"我的单词"显示
+        this.updateMasteredWordsDisplay();
+    }
+
+    addPaginationControls(container, totalPages) {
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'pagination';
+        
+        // 上一页按钮
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'pagination-btn';
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        prevBtn.disabled = this.currentPage === 1;
+        prevBtn.onclick = () => this.goToPage(this.currentPage - 1);
+        
+        // 页码
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'page-info';
+        pageInfo.textContent = `${this.currentPage} / ${totalPages}`;
+        
+        // 下一页按钮
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'pagination-btn';
+        nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        nextBtn.disabled = this.currentPage === totalPages;
+        nextBtn.onclick = () => this.goToPage(this.currentPage + 1);
+        
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(pageInfo);
+        paginationDiv.appendChild(nextBtn);
+        
+        container.appendChild(paginationDiv);
+    }
+
+    goToPage(page) {
+        this.currentPage = page;
+        this.renderWordbook();
+    }
+
+    addWordbookEventListeners() {
+        const wordbookContainer = document.getElementById('wordbook-container');
+        
+        // 星星点击事件
         wordbookContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('star')) {
                 const starContainer = e.target.parentElement;
@@ -353,7 +457,50 @@ class WendyApp {
                 const starIndex = Array.from(starContainer.children).indexOf(e.target);
                 this.updateWordMastery(wordId, starIndex + 1);
             }
+            
+            // 朗读图标点击事件
+            if (e.target.closest('.word-item-speak')) {
+                const speakBtn = e.target.closest('.word-item-speak');
+                const word = speakBtn.getAttribute('data-word');
+                this.speakWord(word);
+            }
         });
+    }
+
+    updateMasteredWordsDisplay() {
+        const masteredWords = this.wordDatabase.filter(word => word.mastery_level >= 3);
+        const masteredContainer = document.getElementById('mastered-words');
+        
+        if (!masteredContainer) return;
+        
+        masteredContainer.innerHTML = '';
+        
+        if (masteredWords.length === 0) {
+            masteredContainer.innerHTML = '<p style="text-align: center; color: #888;">还没有掌握的单词</p>';
+            return;
+        }
+        
+        masteredWords.forEach(word => {
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'mastered-word-item';
+            wordDiv.innerHTML = `
+                <div class="word-text">${word.english_word}</div>
+                <div class="word-pronunciation">${word.pronunciation || ''}</div>
+                <div class="word-meaning">${word.chinese_meaning}</div>
+            `;
+            masteredContainer.appendChild(wordDiv);
+        });
+    }
+
+    speakWord(word) {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.8;
+            speechSynthesis.speak(utterance);
+        } else {
+            this.showNotification('您的浏览器不支持语音朗读', 'warning');
+        }
     }
 
     // 更新单词掌握程度
@@ -372,9 +519,13 @@ class WendyApp {
                     }
                 }
 
-                // 如果达到3星，显示祝贺
+                // 如果达到3星，显示祝贺并延迟刷新
                 if (masteryLevel === 3) {
                     this.showCongratulation();
+                    // 延迟刷新以显示祝贺动画
+                    setTimeout(() => {
+                        this.renderWordbook();
+                    }, 2000);
                 }
             }
         } catch (error) {
@@ -574,6 +725,143 @@ class WendyApp {
     }
 
     // 显示通知
+    // ====== 对话功能方法 ======
+    async handleChat() {
+        const chatInput = document.getElementById('chat-input');
+        const message = chatInput.value.trim();
+        
+        console.log('🤖 开始AI对话处理');
+        console.log('📝 用户消息:', message);
+        
+        if (!message) {
+            console.log('❌ 消息为空');
+            this.showNotification('请输入要问的问题', 'warning');
+            return;
+        }
+
+        // 显示用户消息
+        console.log('💬 添加用户消息到界面');
+        this.addChatMessage(message, 'user');
+        
+        // 清空输入框
+        chatInput.value = '';
+        
+        try {
+            console.log('📡 发送API请求...');
+            // 显示加载状态
+            this.addChatMessage('正在思考中...', 'assistant', true);
+            
+            const response = await this.api.chatWithAI(message);
+            
+            console.log('📥 收到API响应:', response);
+            
+            // 移除加载消息
+            this.removeLoadingMessage();
+            
+            if (response.success) {
+                console.log('✅ API调用成功');
+                console.log('💬 AI回复长度:', response.response ? response.response.length : 0);
+                this.addChatMessage(response.response, 'assistant');
+            } else {
+                console.log('❌ API调用失败:', response.error);
+                this.addChatMessage('抱歉，我现在无法回答这个问题。请稍后再试。', 'assistant');
+            }
+        } catch (error) {
+            this.removeLoadingMessage();
+            console.error('💥 AI对话异常:', error);
+            this.addChatMessage('抱歉，网络连接出现问题。请检查网络后重试。', 'assistant');
+        }
+    }
+
+    async handleDeepSeekChat() {
+        // 获取当前翻译结果
+        const translatedText = document.querySelector('.translated-text')?.textContent;
+        const originalText = document.querySelector('.original-text')?.textContent;
+        
+        if (!translatedText || !originalText) {
+            this.showNotification('请先进行翻译再使用AI助手', 'warning');
+            return;
+        }
+
+        // 切换到对话页面
+        this.switchToTab('chat');
+        
+        // 发送关于翻译的问题
+        const question = `请帮我详细解释单词"${originalText}"（${translatedText}）的用法、例句和相关知识点，适合小学生学习。`;
+        
+        setTimeout(() => {
+            this.addChatMessage(question, 'user');
+            this.handleChatWithMessage(question);
+        }, 500);
+    }
+
+    async handleChatWithMessage(message) {
+        try {
+            this.addChatMessage('正在思考中...', 'assistant', true);
+            
+            const response = await this.api.chatWithAI(message);
+            
+            this.removeLoadingMessage();
+            
+            if (response.success) {
+                this.addChatMessage(response.response, 'assistant');
+            } else {
+                this.addChatMessage('抱歉，我现在无法回答这个问题。请稍后再试。', 'assistant');
+            }
+        } catch (error) {
+            this.removeLoadingMessage();
+            console.error('AI对话失败:', error);
+            this.addChatMessage('抱歉，网络连接出现问题。请检查网络后重试。', 'assistant');
+        }
+    }
+
+    addChatMessage(content, sender, isLoading = false) {
+        const chatMessages = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender}`;
+        if (isLoading) {
+            messageDiv.className += ' loading';
+        }
+        
+        // 添加头像（适配CSS的flex布局）
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        if (sender === 'user') {
+            avatar.innerHTML = '<i class="fas fa-user"></i>';
+        } else {
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        }
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.textContent = content;
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(messageContent);
+        chatMessages.appendChild(messageDiv);
+        
+        // 强制重新渲染后滚动到底部
+        messageDiv.offsetHeight;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    removeLoadingMessage() {
+        const loadingMessage = document.querySelector('.chat-message.loading');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
+    }
+
+    switchToTab(tabName) {
+        // 移除所有活跃状态
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // 激活指定页签
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
     showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');
         const notificationText = document.getElementById('notification-text');
