@@ -43,7 +43,7 @@ wendy-translator/
 ## 🚀 快速开始
 
 ### 系统要求
-- Python 3.6+
+- Python 3.8+
 - 现代浏览器 (Chrome, Firefox, Safari, Edge)
 
 ### 🚀 快速启动
