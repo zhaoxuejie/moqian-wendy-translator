@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>温蒂的翻译助手</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-pink">
+    <div class="app-container">
+        <div class="header">
+            <div class="header-assistant" id="assistant">
+                <img src="img/kenan.jpg" alt="柯南头像" id="assistant-avatar">
+            </div>
+            <h1 id="app-title">温蒂的翻译助手</h1>
+            <p id="app-subtitle">小语随时为你服务！</p>
+        </div>
+        
+        <div class="settings-menu" id="settings-menu">
+            <div class="settings-option" id="avatar-setting-btn">
+                <i class="fas fa-user-circle"></i> <span id="avatar-text">更换头像</span>
+            </div>
+            
+            <div class="avatar-options" id="avatar-options" style="display: none;">
+                <div class="avatar-option" data-avatar="img/kenan.jpg">
+                    <img src="img/kenan.jpg" alt="柯南">
+                </div>
+                <div class="avatar-option" data-avatar="img/xiaowanzi.jpg">
+                    <img src="img/xiaowanzi.jpg" alt="小丸子">
+                </div>
+                <div class="avatar-option" data-avatar="img/duola.jpg">
+                    <img src="img/duola.jpg" alt="哆啦A梦">
+                </div>
+            </div>
+            
+            <div class="settings-option" id="theme-setting-btn">
+                <i class="fas fa-palette"></i> <span id="theme-text">更换主题</span>
+            </div>
+            
+            <div class="theme-options" id="theme-options" style="display: none;">
+                <div class="theme-option theme-pink-bg active" data-theme="pink"></div>
+                <div class="theme-option theme-blue-bg" data-theme="blue"></div>
+                <div class="theme-option theme-purple-bg" data-theme="purple"></div>
+                <div class="theme-option theme-green-bg" data-theme="green"></div>
+            </div>
+            
+            <div class="settings-option" id="sound-setting-btn">
+                <i class="fas fa-volume-up"></i> <span id="sound-text">音效设置</span>
+                <div class="volume-control" id="volume-control" style="display: none;">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" min="0" max="100" value="50" class="volume-slider" id="volume-slider">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+            </div>
+            
+            <div class="settings-option">
+                <i class="fas fa-moon"></i> <span id="night-text">夜间模式</span>
+            </div>
+            
+            <div class="settings-option" id="language-setting-btn">
+                <i class="fas fa-language"></i> <span id="language-text">语言设置</span>
+                <div class="language-options" id="language-options" style="display: none;">
+                    <div class="language-option active" data-lang="zh">中文</div>
+                    <div class="language-option" data-lang="en">English</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="welcome-message">
+                <p id="welcome-text">你好，温蒂！今天想学习什么有趣的单词呢？</p>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" data-tab="translate"><span id="translate-tab-text">翻译</span></div>
+                <div class="tab" data-tab="chat"><span id="chat-tab-text">对话</span></div>
+                <div class="tab" data-tab="wordbook"><span id="wordbook-tab-text">单词本</span></div>
+                <div class="tab" data-tab="progress"><span id="progress-tab-text">成长记录</span></div>
+            </div>
+            
+            <div class="tab-content active" id="translate-tab">
+                <div class="input-section">
+                    <div class="input-area">
+                        <textarea placeholder="在这里输入或说出你想翻译的词语..." id="translate-input"></textarea>
+                        <div class="input-options">
+                            <div class="option-btn active" data-input="text">
+                                <i class="fas fa-keyboard"></i>
+                            </div>
+                            <div class="option-btn" data-input="voice">
+                                <i class="fas fa-microphone"></i>
+                            </div>
+                            <div class="option-btn" data-input="camera">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="translate-btn" id="translate-btn">开始翻译 <i class="fas fa-magic"></i></button>
+                </div>
+                
+                <div class="result-section" id="translation-result">
+                    <div class="result-header">
+                        <h3 id="result-title">翻译结果</h3>
+                        <div class="word-actions">
+                            <div class="word-image">
+                                <i class="fas fa-apple-alt"></i>
+                            </div>
+                            <div class="deepseek-chat" id="deepseek-chat-btn" title="使用AI助手深度学习">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="result-content">
+                        <div class="translation-item">
+                            <div class="add-to-wordbook" title="添加到单词本" id="add-to-wordbook-btn">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="original-text">apple</div>
+                            <div class="translated-text">苹果</div>
+                            <div class="pronunciation">
+                                /ˈæp.əl/
+                                <div class="speaker-btn" title="朗读">
+                                    <i class="fas fa-volume-up"></i>
+                                </div>
+                            </div>
+                            <div class="example-sentence">I like to eat red apples. 我喜欢吃红苹果。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="chat-tab">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <p id="chat-welcome-text">你好，温蒂！我是你的AI学习助手，有什么问题都可以问我哦！</p>
+                        </div>
+                    </div>
+                    
+                    <div class="input-section">
+                        <div class="input-area">
+                            <textarea placeholder="在这里输入或说出你想问的问题..." id="chat-input"></textarea>
+                            <div class="input-options">
+                                <div class="option-btn active" data-input="text">
+                                    <i class="fas fa-keyboard"></i>
+                                </div>
+                                <div class="option-btn" data-input="voice">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                                <div class="option-btn" data-input="camera">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="chat-btn" id="chat-btn">开始对话 <i class="fas fa-robot"></i></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="wordbook-tab">
+                <div class="wordbook" id="wordbook-container">
+                    <!-- 单词将通过JavaScript动态生成 -->
+                </div>
+                
+                <div class="milestone">
+                    <h3 id="milestone-title">学习里程碑</h3>
+                    <p id="milestone-text">已学会 <strong>42</strong> 个单词，继续加油！</p>
+                    <div class="progress-bar">
+                        <div class="progress"></div>
+                    </div>
+                    <p id="next-target-text">下一个目标：50个单词</p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="progress-tab">
+                <div class="my-words-section">
+                    <h3 id="my-words-title">我的单词</h3>
+                    <div class="mastered-words" id="mastered-words">
+                        <!-- 已掌握的单词将在这里动态显示 -->
+                    </div>
+                </div>
+                
+                <div class="milestone">
+                    <h3 id="progress-title">成长记录</h3>
+                    <p><i class="fas fa-trophy"></i> <span id="streak-text">连续学习 7 天</span></p>
+                    <p><i class="fas fa-star"></i> <span id="badges-text">已获得 5 枚成就徽章</span></p>
+                    <p><i class="fas fa-book"></i> <span id="monthly-text">本月学习 28 个新单词</span></p>
+                </div>
+                
+                <div class="welcome-message" style="margin-top: 20px;">
+                    <p id="encouragement-text">亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p id="footer-text">专为温蒂打造 • 充满爱的学习助手</p>
+        </footer>
+    </div>
+    
+    <div class="notification" id="notification">
+        <i class="fas fa-bell"></i>
+        <div id="notification-text">新单词已添加到单词本！</div>
+    </div>
+
+    <div class="congratulation" id="congratulation">
+        <i class="fas fa-trophy"></i>
+        <h3 id="congratulation-title">恭喜！</h3>
+        <p id="congratulation-text">温蒂，你太棒了！已经记住了这个单词！</p>
+    </div>
+
+    <script src="api.js"></script>
+    <script>
+        // 多语言文本（保留用于静态界面显示）
+        const translations = {
+            zh: {
+                appTitle: "温蒂的翻译助手",
+                appSubtitle: "小语随时为你服务！",
+                welcomeText: "你好，温蒂！今天想学习什么有趣的单词呢？",
+                translateTab: "翻译",
+                chatTab: "对话",
+                wordbookTab: "单词本",
+                progressTab: "成长记录",
+                translateInput: "在这里输入或说出你想翻译的词语...",
+                translateBtn: "开始翻译",
+                resultTitle: "翻译结果",
+                addToWordbook: "添加到单词本",
+                milestoneTitle: "学习里程碑",
+                nextTargetText: "下一个目标：50个单词",
+                progressTitle: "成长记录",
+                chatWelcomeText: "你好，温蒂！我是你的AI学习助手，有什么问题都可以问我哦！",
+                encouragementText: "亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！",
+                footerText: "专为温蒂打造 • 充满爱的学习助手",
+                congratulationTitle: "恭喜！",
+                congratulationText: "温蒂，你太棒了！已经记住了这个单词！",
+                settings: {
+                    avatar: "更换头像",
+                    theme: "更换主题",
+                    sound: "音效设置",
+                    night: "夜间模式",
+                    language: "语言设置"
+                }
+            },
+            en: {
+                appTitle: "Wendy's Translation Assistant",
+                appSubtitle: "Xiaoyu is here to help!",
+                welcomeText: "Hello Wendy! What interesting words do you want to learn today?",
+                translateTab: "Translate",
+                wordbookTab: "Wordbook",
+                progressTab: "Progress",
+                translateInput: "Type or speak the word you want to translate...",
+                translateBtn: "Translate",
+                resultTitle: "Translation Result",
+                addToWordbook: "Add to Wordbook",
+                milestoneTitle: "Learning Milestone",
+                nextTargetText: "Next goal: 50 words",
+                progressTitle: "Progress Record",
+                encouragementText: "Dear Wendy, your progress is amazing! Dad is so proud of you!",
+                footerText: "Made for Wendy • Learning Assistant with Love",
+                congratulationTitle: "Congratulations!",
+                congratulationText: "Wendy, you're amazing! You've mastered this word!",
+                settings: {
+                    avatar: "Avatar",
+                    theme: "Theme",
+                    sound: "Sound",
+                    night: "Night",
+                    language: "Language"
+                }
+            }
+        };
+
+        // 简化的前端界面控制（大部分功能已移至api.js）
+        let currentLanguage = 'zh';
+
+        // 更新界面语言（保留用于静态文本显示）
+        function updateLanguage(lang) {
+            currentLanguage = lang;
+            const t = translations[lang];
+            
+            // 更新界面文本
+            document.getElementById('app-title').textContent = t.appTitle;
+            document.getElementById('app-subtitle').textContent = t.appSubtitle;
+            document.getElementById('welcome-text').textContent = t.welcomeText;
+            document.getElementById('translate-tab-text').textContent = t.translateTab;
+            document.getElementById('wordbook-tab-text').textContent = t.wordbookTab;
+            document.getElementById('progress-tab-text').textContent = t.progressTab;
+            document.getElementById('translate-input').placeholder = t.translateInput;
+            document.getElementById('translate-btn').innerHTML = t.translateBtn + ' <i class="fas fa-magic"></i>';
+            document.getElementById('result-title').textContent = t.resultTitle;
+            document.getElementById('add-to-wordbook-btn').setAttribute('title', t.addToWordbook);
+            document.getElementById('milestone-title').textContent = t.milestoneTitle;
+            document.getElementById('next-target-text').textContent = t.nextTargetText;
+            document.getElementById('progress-title').textContent = t.progressTitle;
+            document.getElementById('footer-text').textContent = t.footerText;
+            document.getElementById('congratulation-title').textContent = t.congratulationTitle;
+            document.getElementById('congratulation-text').textContent = t.congratulationText;
+            
+            // 更新设置菜单文本
+            document.getElementById('avatar-text').textContent = t.settings.avatar;
+            document.getElementById('theme-text').textContent = t.settings.theme;
+            document.getElementById('sound-text').textContent = t.settings.sound;
+            document.getElementById('night-text').textContent = t.settings.night;
+            document.getElementById('language-text').textContent = t.settings.language;
+        }
+
+        // 选项卡切换功能
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab') + '-tab';
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // 输入选项切换
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // 设置菜单功能（保留界面交互，数据同步由api.js处理）
+        const assistant = document.getElementById('assistant');
+        const settingsMenu = document.getElementById('settings-menu');
+        const avatarSettingBtn = document.getElementById('avatar-setting-btn');
+        const avatarOptions = document.getElementById('avatar-options');
+        const themeSettingBtn = document.getElementById('theme-setting-btn');
+        const themeOptions = document.getElementById('theme-options');
+        const soundSettingBtn = document.getElementById('sound-setting-btn');
+        const volumeControl = document.getElementById('volume-control');
+        const languageSettingBtn = document.getElementById('language-setting-btn');
+        const languageOptions = document.getElementById('language-options');
+        
+        // 点击助手头像显示/隐藏设置菜单
+        assistant.addEventListener('click', function(e) {
+            e.stopPropagation();
+            settingsMenu.classList.toggle('show');
+            
+            // 隐藏所有选项面板
+            avatarOptions.style.display = 'none';
+            themeOptions.style.display = 'none';
+            volumeControl.style.display = 'none';
+            languageOptions.style.display = 'none';
+        });
+        
+        // 点击文档其他位置关闭设置菜单
+        document.addEventListener('click', function() {
+            settingsMenu.classList.remove('show');
+            avatarOptions.style.display = 'none';
+            themeOptions.style.display = 'none';
+            volumeControl.style.display = 'none';
+            languageOptions.style.display = 'none';
+        });
+        
+        // 阻止设置菜单内部的点击事件冒泡
+        settingsMenu.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // 设置选项按钮点击事件（仅界面控制，数据同步由api.js处理）
+        avatarSettingBtn.addEventListener('click', function() {
+            avatarOptions.style.display = avatarOptions.style.display === 'none' ? 'grid' : 'none';
+            themeOptions.style.display = 'none';
+            volumeControl.style.display = 'none';
+            languageOptions.style.display = 'none';
+        });
+        
+        themeSettingBtn.addEventListener('click', function() {
+            themeOptions.style.display = themeOptions.style.display === 'none' ? 'flex' : 'none';
+            avatarOptions.style.display = 'none';
+            volumeControl.style.display = 'none';
+            languageOptions.style.display = 'none';
+        });
+        
+        soundSettingBtn.addEventListener('click', function() {
+            volumeControl.style.display = volumeControl.style.display === 'none' ? 'flex' : 'none';
+            avatarOptions.style.display = 'none';
+            themeOptions.style.display = 'none';
+            languageOptions.style.display = 'none';
+        });
+        
+        languageSettingBtn.addEventListener('click', function() {
+            languageOptions.style.display = languageOptions.style.display === 'none' ? 'flex' : 'none';
+            avatarOptions.style.display = 'none';
+            themeOptions.style.display = 'none';
+            volumeControl.style.display = 'none';
+        });
+
+        // 页面加载完成后的初始化（保留本地存储的兼容性）
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认语言
+            const savedLanguage = localStorage.getItem('appLanguage') || 'zh';
+            document.querySelectorAll('.language-option').forEach(opt => {
+                if (opt.getAttribute('data-lang') === savedLanguage) {
+                    opt.classList.add('active');
+                } else {
+                    opt.classList.remove('active');
+                }
+            });
+            updateLanguage(savedLanguage);
+            
+            console.log('✅ 前端界面初始化完成');
+        });
+    </script>
+</body>
+</html>

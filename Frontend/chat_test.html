@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对话功能测试</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { 
+            padding: 20px; 
+            background: var(--bg-color, #f5f5f5);
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 10px; 
+        }
+        button { 
+            margin: 5px; 
+            padding: 10px 15px; 
+            border: none;
+            border-radius: 5px;
+            background: var(--primary, #4CAF50);
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { opacity: 0.8; }
+        #log { 
+            background: #f5f5f5; 
+            padding: 10px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px;
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px;
+        }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body class="theme-pink">
+    <div class="test-container">
+        <h1>🤖 温蒂翻译助手 - 对话功能测试</h1>
+        
+        <div class="status info" id="status">
+            准备开始测试...
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 快速测试</h3>
+            <button onclick="testBasicMessage()">测试消息显示</button>
+            <button onclick="testAPIConnection()">测试API连接</button>
+            <button onclick="testCompleteFlow()">完整流程测试</button>
+            <button onclick="clearMessages()">清空消息</button>
+        </div>
+
+        <!-- 使用与应用相同的对话界面结构 -->
+        <div class="chat-container" style="height: 400px;">
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome-message">
+                    <p>欢迎使用对话功能测试！点击上方按钮开始测试。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <div class="input-area">
+                <textarea id="chat-input" placeholder="在这里输入你想问的问题..." rows="3">Hello, how are you?</textarea>
+            </div>
+            <button class="chat-btn" onclick="sendMessage()">发送消息</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 测试日志</h3>
+            <div id="log"></div>
+            <button onclick="clearLog()">清空日志</button>
+        </div>
+    </div>
+
+    <script>
+        let messageCount = 0;
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function addChatMessage(content, sender) {
+            log(`💬 添加消息: ${sender} - ${content.substring(0, 30)}...`);
+            
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) {
+                log('❌ 找不到chat-messages容器');
+                return false;
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            
+            // 添加头像
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            if (sender === 'user') {
+                avatar.innerHTML = '<i class="fas fa-user"></i>';
+            } else {
+                avatar.innerHTML = '<i class="fas fa-robot"></i>';
+            }
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            chatMessages.appendChild(messageDiv);
+            
+            // 滚动到底部
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            messageCount++;
+            log(`✅ 消息添加成功 (总数: ${messageCount})`);
+            return true;
+        }
+
+        function testBasicMessage() {
+            log('🧪 测试基本消息显示...');
+            updateStatus('测试消息显示...', 'info');
+            
+            const success = addChatMessage('这是一条测试消息，用于验证显示功能是否正常。', 'assistant');
+            if (success) {
+                updateStatus('消息显示测试成功', 'success');
+            } else {
+                updateStatus('消息显示测试失败', 'error');
+            }
+        }
+
+        async function testAPIConnection() {
+            log('📡 测试API连接...');
+            updateStatus('测试API连接...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'wendy',
+                        message: 'Hello, this is a test message',
+                        context: ''
+                    })
+                });
+                
+                log(`📥 响应状态: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`📝 API响应: ${JSON.stringify(data)}`);
+                    
+                    if (data.success && data.response) {
+                        addChatMessage(data.response, 'assistant');
+                        updateStatus('API连接测试成功', 'success');
+                    } else {
+                        updateStatus('API返回错误', 'error');
+                    }
+                } else {
+                    log(`❌ API错误: ${response.statusText}`);
+                    updateStatus('API连接失败', 'error');
+                }
+            } catch (error) {
+                log(`💥 网络错误: ${error.message}`);
+                updateStatus('网络连接失败', 'error');
+            }
+        }
+
+        async function testCompleteFlow() {
+            log('🔄 测试完整流程...');
+            updateStatus('测试完整对话流程...', 'info');
+            
+            // 添加用户消息
+            const userInput = document.getElementById('chat-input').value || 'Hello, how are you?';
+            addChatMessage(userInput, 'user');
+            
+            // 显示加载状态
+            addChatMessage('正在思考中...', 'assistant');
+            
+            // 调用API
+            try {
+                const response = await fetch('http://localhost:5000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'wendy',
+                        message: userInput,
+                        context: ''
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 移除加载消息（最后一个assistant消息）
+                    const messages = document.querySelectorAll('.chat-message.assistant');
+                    if (messages.length > 0) {
+                        messages[messages.length - 1].remove();
+                    }
+                    
+                    if (data.success && data.response) {
+                        addChatMessage(data.response, 'assistant');
+                        updateStatus('完整流程测试成功', 'success');
+                    } else {
+                        addChatMessage('API调用失败: ' + (data.error || '未知错误'), 'assistant');
+                        updateStatus('API返回错误', 'error');
+                    }
+                } else {
+                    updateStatus('API请求失败', 'error');
+                }
+            } catch (error) {
+                updateStatus('网络连接失败', 'error');
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) {
+                updateStatus('请输入消息', 'error');
+                return;
+            }
+            
+            await testCompleteFlow();
+        }
+
+        function clearMessages() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '<div class="welcome-message"><p>消息已清空，可以重新开始测试。</p></div>';
+            messageCount = 0;
+            log('🗑️ 消息已清空');
+            updateStatus('消息已清空', 'info');
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 对话功能测试页面加载完成');
+            updateStatus('测试页面就绪，可以开始测试', 'success');
+            
+            // 添加回车键发送功能
+            document.getElementById('chat-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
