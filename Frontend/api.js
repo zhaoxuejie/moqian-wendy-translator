@@ -136,6 +136,44 @@ class WendyApp {
         this.selectedVoiceName = ''; // 用户选择的语音名称
         this.selectedVoiceLang = ''; // 用户选择的语音语言
         this.availableVoices = []; // 可用的语音列表
+        
+        // 语音名称到简短昵称的映射表
+        this.voiceNicknames = {
+            // 中文语音昵称
+            'Microsoft Yaoyao': '小柔',
+            'Microsoft Kangkang': '小星',
+            'Microsoft Huihui': '小莹',
+            'Microsoft Yaoyao - Chinese (Simplified)': '小柔',
+            'Microsoft Kangkang - Chinese (Simplified)': '小星',
+            'Microsoft Huihui - Chinese (Simplified)': '小莹',
+            'Google 普通话（中国大陆）': '小语',
+            'Google 普通话（台湾）': '小台',
+            // 英文语音昵称
+            'Microsoft Zira': '小柔',
+            'Microsoft David': '小星',
+            'Microsoft Mark': '小莹',
+            'Microsoft Zira - English (United States)': '小柔',
+            'Microsoft David - English (United States)': '小星',
+            'Microsoft Mark - English (United States)': '小莹',
+            'Google US English': '小美',
+            'Google UK English': '小英',
+            'Alex': '小柔',
+            'Samantha': '小星',
+            'Victoria': '小莹',
+            'Daniel': '小星',
+            'Karen': '小柔',
+            'Moira': '小莹',
+            'Tessa': '小柔',
+            'Veena': '小星',
+            'Fiona': '小莹',
+            'Sinji': '小星',
+            'Ting-Ting': '小柔',
+            'Yuna': '小莹',
+            'Yuki': '小星'
+        };
+        
+        // 昵称池（用于随机生成）
+        this.nicknamePool = ['小柔', '小星', '小莹', '小语', '小美', '小英', '小台', '小悦', '小乐', '小甜', '小暖', '小晴', '小月', '小阳', '小风', '小云', '小露', '小霜', '小雪', '小梅', '小兰', '小竹', '小菊', '小荷', '小莲', '小桃', '小梨', '小杏', '小樱', '小枫', '小桐', '小柳', '小杨', '小松', '小柏', '小楠', '小桂', '小榕', '小槐', '小榆', '小桦', '小椿', '小楸', '小梓', '小桑', '小槐', '小榆', '小杨', '小柳'];
     }
 
     // 初始化应用
@@ -879,12 +917,34 @@ class WendyApp {
                 option.classList.remove('active');
             }
         });
+        
+        // 更新语音设置相关的文本
+        this.updateVoiceSettingsText(lang);
 
         // 保存到服务器
         try {
             await this.api.updateUserProfile({ language: lang });
         } catch (error) {
             console.error('保存语言设置失败:', error);
+        }
+    }
+    
+    // 更新语音设置相关的文本
+    updateVoiceSettingsText(lang) {
+        const voiceText = document.getElementById('voice-text');
+        const chineseVoiceTitle = document.getElementById('chinese-voice-title');
+        const englishVoiceTitle = document.getElementById('english-voice-title');
+        
+        if (typeof translations !== 'undefined' && translations[lang]) {
+            if (voiceText) {
+                voiceText.textContent = translations[lang].voiceText || (lang === 'zh' ? '语音设置' : 'Voice Settings');
+            }
+            if (chineseVoiceTitle) {
+                chineseVoiceTitle.textContent = translations[lang].chineseVoiceTitle || (lang === 'zh' ? '中文语音' : 'Chinese Voices');
+            }
+            if (englishVoiceTitle) {
+                englishVoiceTitle.textContent = translations[lang].englishVoiceTitle || (lang === 'zh' ? '英文语音' : 'English Voices');
+            }
         }
     }
 
@@ -1137,6 +1197,18 @@ class WendyApp {
         this.showNotification('图片文字已识别', 'info');
     }
     
+    // 获取语音的简短昵称
+    getVoiceNickname(voiceName, voiceIndex = 0) {
+        // 优先使用映射表中的昵称
+        if (this.voiceNicknames[voiceName]) {
+            return this.voiceNicknames[voiceName];
+        }
+        
+        // 如果没有映射，从昵称池中按索引选择（确保同一语音总是显示相同昵称）
+        const index = voiceIndex % this.nicknamePool.length;
+        return this.nicknamePool[index];
+    }
+    
     // 初始化语音列表
     initVoices() {
         if (!('speechSynthesis' in window)) {
@@ -1174,13 +1246,16 @@ class WendyApp {
         const englishVoices = this.availableVoices.filter(v => v.lang.startsWith('en'));
         
         // 渲染中文语音
-        chineseVoices.forEach(voice => {
+        chineseVoices.forEach((voice, index) => {
             const option = document.createElement('div');
             option.className = 'voice-option';
             if (this.selectedVoiceName === voice.name) {
                 option.classList.add('active');
             }
-            option.textContent = voice.name;
+            // 使用简短昵称显示
+            const nickname = this.getVoiceNickname(voice.name, index);
+            option.textContent = nickname;
+            option.title = voice.name; // 鼠标悬停时显示完整名称
             option.setAttribute('data-voice-name', voice.name);
             option.setAttribute('data-voice-lang', 'zh');
             option.addEventListener('click', () => {
@@ -1190,13 +1265,16 @@ class WendyApp {
         });
         
         // 渲染英文语音
-        englishVoices.forEach(voice => {
+        englishVoices.forEach((voice, index) => {
             const option = document.createElement('div');
             option.className = 'voice-option';
             if (this.selectedVoiceName === voice.name) {
                 option.classList.add('active');
             }
-            option.textContent = voice.name;
+            // 使用简短昵称显示
+            const nickname = this.getVoiceNickname(voice.name, chineseVoices.length + index);
+            option.textContent = nickname;
+            option.title = voice.name; // 鼠标悬停时显示完整名称
             option.setAttribute('data-voice-name', voice.name);
             option.setAttribute('data-voice-lang', 'en');
             option.addEventListener('click', () => {

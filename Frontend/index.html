@@ -58,11 +58,11 @@
                 <i class="fas fa-microphone"></i> <span id="voice-text">语音设置</span>
                 <div class="voice-options" id="voice-options" style="display: none;">
                     <div class="voice-section">
-                        <div class="voice-section-title">中文语音</div>
+                        <div class="voice-section-title" id="chinese-voice-title">中文语音</div>
                         <div class="voice-list" id="chinese-voices"></div>
                     </div>
                     <div class="voice-section">
-                        <div class="voice-section-title">英文语音</div>
+                        <div class="voice-section-title" id="english-voice-title">英文语音</div>
                         <div class="voice-list" id="english-voices"></div>
                     </div>
                 </div>
@@ -248,6 +248,9 @@
                 footerText: "专为温蒂打造 • 充满爱的学习助手",
                 congratulationTitle: "恭喜！",
                 congratulationText: "温蒂，你太棒了！已经记住了这个单词！",
+                voiceText: "语音设置",
+                chineseVoiceTitle: "中文语音",
+                englishVoiceTitle: "英文语音",
                 settings: {
                     avatar: "更换头像",
                     theme: "更换主题",
@@ -280,7 +283,10 @@
                     sound: "Sound",
                     night: "Night",
                     language: "Language"
-                }
+                },
+                voiceText: "Voice Settings",
+                chineseVoiceTitle: "Chinese Voices",
+                englishVoiceTitle: "English Voices"
             }
         };
 
@@ -316,6 +322,25 @@
             document.getElementById('sound-text').textContent = t.settings.sound;
             document.getElementById('night-text').textContent = t.settings.night;
             document.getElementById('language-text').textContent = t.settings.language;
+            
+            // 更新语音设置文本
+            if (t.voiceText) {
+                const voiceText = document.getElementById('voice-text');
+                if (voiceText) voiceText.textContent = t.voiceText;
+            }
+            if (t.chineseVoiceTitle) {
+                const chineseVoiceTitle = document.getElementById('chinese-voice-title');
+                if (chineseVoiceTitle) chineseVoiceTitle.textContent = t.chineseVoiceTitle;
+            }
+            if (t.englishVoiceTitle) {
+                const englishVoiceTitle = document.getElementById('english-voice-title');
+                if (englishVoiceTitle) englishVoiceTitle.textContent = t.englishVoiceTitle;
+            }
+            
+            // 调用wendyApp的更新方法（如果已初始化）
+            if (typeof wendyApp !== 'undefined' && wendyApp.updateVoiceSettingsText) {
+                wendyApp.updateVoiceSettingsText(lang);
+            }
         }
 
         // 选项卡切换功能
