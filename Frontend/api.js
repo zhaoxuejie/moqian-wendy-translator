@@ -133,6 +133,9 @@ class WendyApp {
         this.wordDatabase = [];
         this.userProfile = null;
         this.learningProgress = null;
+        this.selectedVoiceName = ''; // 用户选择的语音名称
+        this.selectedVoiceLang = ''; // 用户选择的语音语言
+        this.availableVoices = []; // 可用的语音列表
     }
 
     // 初始化应用
@@ -253,21 +256,35 @@ class WendyApp {
             });
         });
 
-        // 主题选择
-        document.querySelectorAll('.theme-option').forEach(option => {
-            option.addEventListener('click', (e) => {
-                const theme = e.target.getAttribute('data-theme');
-                this.changeTheme(theme);
+        // 主题选择（使用事件委托，支持动态添加的元素）
+        const themeOptionsContainer = document.getElementById('theme-options');
+        if (themeOptionsContainer) {
+            themeOptionsContainer.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                const option = e.target.closest('.theme-option');
+                if (option) {
+                    const theme = option.getAttribute('data-theme');
+                    if (theme) {
+                        this.changeTheme(theme);
+                    }
+                }
             });
-        });
+        }
 
-        // 头像选择
-        document.querySelectorAll('.avatar-option').forEach(option => {
-            option.addEventListener('click', (e) => {
-                const avatar = e.currentTarget.getAttribute('data-avatar');
-                this.changeAvatar(avatar);
+        // 头像选择（使用事件委托，支持动态添加的元素）
+        const avatarOptionsContainer = document.getElementById('avatar-options');
+        if (avatarOptionsContainer) {
+            avatarOptionsContainer.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                const option = e.target.closest('.avatar-option');
+                if (option) {
+                    const avatar = option.getAttribute('data-avatar');
+                    if (avatar) {
+                        this.changeAvatar(avatar);
+                    }
+                }
             });
-        });
+        }
 
         // 音量控制
         const volumeSlider = document.getElementById('volume-slider');
@@ -276,11 +293,30 @@ class WendyApp {
                 this.updateVolume(e.target.value);
             });
         }
+        
+        // 语音设置按钮
+        const voiceSettingBtn = document.getElementById('voice-setting-btn');
+        if (voiceSettingBtn) {
+            voiceSettingBtn.addEventListener('click', () => {
+                this.toggleVoiceOptions();
+            });
+        }
+        
+        // 注意：设置按钮的显示/隐藏逻辑在 index.html 中已处理
+        // 这里只需要确保选项的点击事件能正确触发
+        
+        // 初始化语音列表（如果浏览器支持）
+        if ('speechSynthesis' in window) {
+            this.initVoices();
+        }
 
         // 语音输入
-        document.querySelector('[data-input="voice"]').addEventListener('click', () => {
-            this.simulateVoiceInput();
-        });
+        const voiceInputBtn = document.querySelector('[data-input="voice"]');
+        if (voiceInputBtn) {
+            voiceInputBtn.addEventListener('click', () => {
+                this.simulateVoiceInput();
+            });
+        }
 
         // 对话按钮
         const chatBtn = document.getElementById('chat-btn');
@@ -295,9 +331,12 @@ class WendyApp {
         }
 
         // 相机输入
-        document.querySelector('[data-input="camera"]').addEventListener('click', () => {
-            this.simulateCameraInput();
-        });
+        const cameraInputBtn = document.querySelector('[data-input="camera"]');
+        if (cameraInputBtn) {
+            cameraInputBtn.addEventListener('click', () => {
+                this.simulateCameraInput();
+            });
+        }
 
         // 页签切换
         document.querySelectorAll('.tab').forEach(tab => {
@@ -809,6 +848,18 @@ class WendyApp {
                 volumeSlider.value = this.userProfile.volume;
             }
         }
+        
+        // 保存语音设置
+        if (this.userProfile.voice_name) {
+            this.selectedVoiceName = this.userProfile.voice_name;
+            this.selectedVoiceLang = this.userProfile.voice_lang || '';
+        }
+        
+        // 保存语音设置
+        if (this.userProfile.voice_name) {
+            this.selectedVoiceName = this.userProfile.voice_name;
+            this.selectedVoiceLang = this.userProfile.voice_lang || '';
+        }
     }
 
     // 改变语言
@@ -940,6 +991,128 @@ class WendyApp {
             this.showNotification('您的浏览器不支持语音朗读', 'warning');
         }
     }
+    
+    // 从HTML中提取纯文本（用于语音朗读）
+    extractTextFromHTML(html) {
+        // 创建临时DOM元素
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // 移除代码块（通常不需要朗读代码）
+        const codeBlocks = tempDiv.querySelectorAll('code');
+        codeBlocks.forEach(code => {
+            code.remove();
+        });
+        
+        // 获取纯文本
+        let text = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // 清理多余的空白字符
+        text = text.replace(/\s+/g, ' ').trim();
+        
+        // 处理一些特殊字符，让朗读更自然
+        text = text.replace(/\./g, '。');
+        text = text.replace(/,/g, '，');
+        text = text.replace(/\?/g, '？');
+        text = text.replace(/!/g, '！');
+        
+        return text;
+    }
+    
+    // 停止当前语音播放
+    stopSpeaking() {
+        if ('speechSynthesis' in window) {
+            speechSynthesis.cancel();
+        }
+    }
+    
+    // 朗读聊天消息（支持中英文混合）
+    speakChatMessage(content) {
+        if (!content) {
+            this.showNotification('没有可朗读的内容', 'warning');
+            return;
+        }
+        
+        // 停止之前的播放
+        this.stopSpeaking();
+        
+        // 如果内容是HTML格式（Markdown转换后的），提取纯文本
+        let textToSpeak = content;
+        if (content.includes('<')) {
+            textToSpeak = this.extractTextFromHTML(content);
+        }
+        
+        if (!textToSpeak || textToSpeak.trim().length === 0) {
+            this.showNotification('没有可朗读的内容', 'warning');
+            return;
+        }
+        
+        // 检测语言（简单判断：如果包含中文字符，使用中文语音；否则使用英文）
+        const hasChinese = /[\u4e00-\u9fa5]/.test(textToSpeak);
+        const hasEnglish = /[a-zA-Z]/.test(textToSpeak);
+        
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // 根据内容设置语言
+            if (hasChinese && hasEnglish) {
+                // 中英文混合，优先使用中文语音
+                utterance.lang = 'zh-CN';
+            } else if (hasChinese) {
+                utterance.lang = 'zh-CN';
+            } else {
+                utterance.lang = 'en-US';
+            }
+            
+            // 设置语音参数
+            const volumeSlider = document.getElementById('volume-slider');
+            utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+            utterance.rate = 0.9; // 稍微慢一点，适合学习
+            utterance.pitch = 1.0;
+            
+            // 选择语音（优先使用用户选择的语音）
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                let selectedVoice = null;
+                
+                // 如果用户选择了语音，优先使用
+                if (this.selectedVoiceName) {
+                    selectedVoice = voices.find(voice => 
+                        voice.name === this.selectedVoiceName && 
+                        (!this.selectedVoiceLang || voice.lang.startsWith(this.selectedVoiceLang))
+                    );
+                }
+                
+                // 如果用户选择的语音不可用，根据内容自动选择
+                if (!selectedVoice) {
+                    selectedVoice = voices.find(voice => {
+                        if (hasChinese) {
+                            return voice.lang.startsWith('zh');
+                        } else {
+                            return voice.lang.startsWith('en');
+                        }
+                    });
+                }
+                
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+            }
+            
+            utterance.onerror = (event) => {
+                console.error('语音朗读错误:', event);
+                this.showNotification('语音朗读失败', 'warning');
+            };
+            
+            utterance.onend = () => {
+                console.log('语音朗读完成');
+            };
+            
+            speechSynthesis.speak(utterance);
+        } else {
+            this.showNotification('您的浏览器不支持语音朗读', 'warning');
+        }
+    }
 
     // 模拟语音输入
     simulateVoiceInput() {
@@ -962,6 +1135,123 @@ class WendyApp {
         const randomWord = sampleWords[Math.floor(Math.random() * sampleWords.length)];
         textarea.value = randomWord;
         this.showNotification('图片文字已识别', 'info');
+    }
+    
+    // 初始化语音列表
+    initVoices() {
+        if (!('speechSynthesis' in window)) {
+            return;
+        }
+        
+        // 等待语音列表加载完成
+        const loadVoices = () => {
+            this.availableVoices = speechSynthesis.getVoices();
+            this.renderVoiceOptions();
+        };
+        
+        // 某些浏览器需要等待voiceschanged事件
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        
+        // 立即尝试加载
+        loadVoices();
+    }
+    
+    // 渲染语音选择选项
+    renderVoiceOptions() {
+        const chineseVoicesContainer = document.getElementById('chinese-voices');
+        const englishVoicesContainer = document.getElementById('english-voices');
+        
+        if (!chineseVoicesContainer || !englishVoicesContainer) return;
+        
+        // 清空现有选项
+        chineseVoicesContainer.innerHTML = '';
+        englishVoicesContainer.innerHTML = '';
+        
+        // 分类语音
+        const chineseVoices = this.availableVoices.filter(v => v.lang.startsWith('zh'));
+        const englishVoices = this.availableVoices.filter(v => v.lang.startsWith('en'));
+        
+        // 渲染中文语音
+        chineseVoices.forEach(voice => {
+            const option = document.createElement('div');
+            option.className = 'voice-option';
+            if (this.selectedVoiceName === voice.name) {
+                option.classList.add('active');
+            }
+            option.textContent = voice.name;
+            option.setAttribute('data-voice-name', voice.name);
+            option.setAttribute('data-voice-lang', 'zh');
+            option.addEventListener('click', () => {
+                this.selectVoice(voice.name, 'zh');
+            });
+            chineseVoicesContainer.appendChild(option);
+        });
+        
+        // 渲染英文语音
+        englishVoices.forEach(voice => {
+            const option = document.createElement('div');
+            option.className = 'voice-option';
+            if (this.selectedVoiceName === voice.name) {
+                option.classList.add('active');
+            }
+            option.textContent = voice.name;
+            option.setAttribute('data-voice-name', voice.name);
+            option.setAttribute('data-voice-lang', 'en');
+            option.addEventListener('click', () => {
+                this.selectVoice(voice.name, 'en');
+            });
+            englishVoicesContainer.appendChild(option);
+        });
+        
+        // 如果没有语音，显示提示
+        if (chineseVoices.length === 0) {
+            chineseVoicesContainer.innerHTML = '<div class="voice-empty">暂无中文语音</div>';
+        }
+        if (englishVoices.length === 0) {
+            englishVoicesContainer.innerHTML = '<div class="voice-empty">暂无英文语音</div>';
+        }
+    }
+    
+    // 切换语音选项显示
+    toggleVoiceOptions() {
+        const voiceOptions = document.getElementById('voice-options');
+        if (voiceOptions) {
+            const isDisplayed = voiceOptions.style.display !== 'none';
+            voiceOptions.style.display = isDisplayed ? 'none' : 'block';
+            
+            // 如果显示，刷新语音列表
+            if (!isDisplayed) {
+                this.initVoices();
+            }
+        }
+    }
+    
+    // 选择语音
+    async selectVoice(voiceName, voiceLang) {
+        this.selectedVoiceName = voiceName;
+        this.selectedVoiceLang = voiceLang;
+        
+        // 更新UI
+        document.querySelectorAll('.voice-option').forEach(option => {
+            option.classList.remove('active');
+            if (option.getAttribute('data-voice-name') === voiceName) {
+                option.classList.add('active');
+            }
+        });
+        
+        // 保存到后端
+        try {
+            await this.api.updateUserProfile({
+                voice_name: voiceName,
+                voice_lang: voiceLang
+            });
+            this.showNotification('语音设置已保存', 'success');
+        } catch (error) {
+            console.error('保存语音设置失败:', error);
+            this.showNotification('保存语音设置失败', 'error');
+        }
     }
 
     // 显示通知
@@ -1171,6 +1461,21 @@ class WendyApp {
         // 如果是助手消息，格式化 markdown；用户消息保持纯文本
         if (sender === 'assistant' && !isLoading) {
             messageContent.innerHTML = this.formatMarkdownForSmallScreen(content);
+            
+            // 为助手消息添加语音播放按钮
+            const speakerBtn = document.createElement('div');
+            speakerBtn.className = 'chat-speaker-btn';
+            speakerBtn.title = '朗读这条消息';
+            speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+            speakerBtn.setAttribute('data-text', content); // 保存原始文本内容
+            
+            // 将按钮添加到消息内容中
+            messageContent.appendChild(speakerBtn);
+            
+            // 绑定点击事件
+            speakerBtn.addEventListener('click', () => {
+                this.speakChatMessage(content);
+            });
         } else {
             messageContent.textContent = content;
         }

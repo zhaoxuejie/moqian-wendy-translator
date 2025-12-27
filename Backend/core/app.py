@@ -187,16 +187,20 @@ def get_user_profile():
     )
     
     if user:
+        # sqlite3.Row 对象不支持 .get() 方法，需要使用字典访问或 try-except
+        user_dict = dict(user)
         return jsonify({
             'success': True,
             'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'display_name': user['display_name'],
-                'avatar': user['avatar'],
-                'theme': user['theme'],
-                'language': user['language'],
-                'volume': user['volume']
+                'id': user_dict.get('id'),
+                'username': user_dict.get('username'),
+                'display_name': user_dict.get('display_name'),
+                'avatar': user_dict.get('avatar'),
+                'theme': user_dict.get('theme'),
+                'language': user_dict.get('language'),
+                'volume': user_dict.get('volume', 50),
+                'voice_name': user_dict.get('voice_name', ''),
+                'voice_lang': user_dict.get('voice_lang', '')
             }
         })
     else:
@@ -213,7 +217,7 @@ def update_user_profile():
     update_fields = []
     update_values = []
     
-    for field in ['display_name', 'avatar', 'theme', 'language', 'volume']:
+    for field in ['display_name', 'avatar', 'theme', 'language', 'volume', 'voice_name', 'voice_lang']:
         if field in data:
             update_fields.append(f"{field} = ?")
             update_values.append(data[field])

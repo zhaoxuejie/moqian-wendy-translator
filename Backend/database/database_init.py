@@ -30,10 +30,20 @@ def init_database():
                 theme VARCHAR(20) DEFAULT 'pink',
                 language VARCHAR(10) DEFAULT 'zh',
                 volume INTEGER DEFAULT 50,
+                voice_name VARCHAR(100) DEFAULT '',
+                voice_lang VARCHAR(10) DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # 如果表已存在，检查是否需要添加新字段
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'voice_name' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN voice_name VARCHAR(100) DEFAULT ''")
+        if 'voice_lang' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN voice_lang VARCHAR(10) DEFAULT ''")
         
         # 创建单词本表
         cursor.execute("""
