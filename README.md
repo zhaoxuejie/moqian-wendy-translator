@@ -47,7 +47,6 @@ wendy-translator/
 │   │                         # - 学习进度统计
 │   │                         # - AI对话处理
 │   ├── style.css            # 样式表
-│   ├── chat_test.html       # 聊天功能测试页面
 │   └── img/                 # 图片资源
 │       ├── kenan.jpg        # 柯南头像
 │       ├── xiaowanzi.jpg    # 小丸子头像
@@ -85,12 +84,12 @@ wendy-translator/
 │       └── test_*.py        # 其他测试文件
 ├── ⚙️ Config/                # 配置文件（注意：实际目录名为Config）
 │   ├── requirements.txt     # Python依赖
-│   ├── start_app.py         # 启动脚本
-│   │                         # - 依赖检查
-│   │                         # - 数据库初始化
-│   │                         # - API配置
-│   │                         # - 实时日志输出
-│   └── start_app_old.py     # 旧版启动脚本
+│   ├── requirements.txt     # Python依赖
+│   └── start_app.py         # 启动脚本
+│                             # - 依赖检查
+│                             # - 数据库初始化
+│                             # - API配置
+│                             # - 实时日志输出
 ├── 📊 report/                # 项目报告
 │   ├── 项目结构说明.md      # 项目结构文档
 │   ├── DeepSeek配置说明.md  # DeepSeek配置指南
@@ -456,14 +455,9 @@ await wendyApp.handleAddToWordbook();
 ## 🧪 测试和调试
 
 ### 测试文件
-项目包含多个测试文件用于功能验证：
+项目包含测试文件用于功能验证：
 
-- `frontend/chat_test.html` - 聊天功能测试
-- `frontend/css_chat_test.html` - CSS样式测试
-- `frontend/css_fix_test.html` - CSS修复验证
-- `frontend/final_css_fix_test.html` - 最终修复验证
-- `backend/tests/test_api.py` - 后端API测试
-- `backend/tests/test_translation_logs.py` - 翻译日志测试
+- `Backend/tests/test_api.py` - 后端API测试
 
 ### 调试指南
 1. **前端调试**：打开浏览器开发者工具查看控制台日志
