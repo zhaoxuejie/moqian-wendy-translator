@@ -511,6 +511,33 @@ body {
     margin-top: 4px;
 }
 
+.mastered-word-speak {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mastered-word-item:hover .mastered-word-speak {
+    opacity: 1;
+}
+
+.mastered-word-speak:hover {
+    background-color: var(--primary);
+    transform: scale(1.1);
+}
+
 .mastered-word-item .word-meaning {
     font-size: 13px;
     color: var(--text);
@@ -609,6 +636,7 @@ body {
     box-shadow: 0 3px 10px rgba(0,0,0,0.05);
     position: relative;
     transition: all 0.3s ease;
+    text-align: center;
 }
 
 .word-item:hover {
@@ -621,6 +649,7 @@ body {
     font-weight: bold;
     color: var(--primary);
     margin-bottom: 5px;
+    text-align: center;
 }
 
 .word-item .pronunciation {
@@ -628,18 +657,23 @@ body {
     color: #888;
     margin-bottom: 8px;
     font-style: italic;
+    text-align: center !important;
+    display: block;
+    width: 100%;
 }
 
 .word-item .meaning {
     font-size: 14px;
     color: var(--text);
     margin-bottom: 10px;
+    text-align: center;
 }
 
 .word-item .stars {
     display: flex;
     gap: 5px;
     font-size: 16px;
+    justify-content: center;
 }
 
 .word-item .star {
@@ -657,10 +691,56 @@ body {
     transform: scale(1.1);
 }
 
-.example-sentence {
+/* 词性样式 */
+.part-of-speech {
+    font-size: 12px;
+    color: #999;
     font-style: italic;
-    margin-top: 10px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* 例句样式 */
+.example-sentence {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.example-sentence .example-en {
+    font-style: italic;
     font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.example-speaker-btn {
+    width: 20px;
+    height: 20px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 10px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.example-speaker-btn:hover {
+    opacity: 1;
+    background-color: var(--primary);
+    transform: scale(1.1);
+}
+
+.example-sentence .example-zh {
+    font-size: 13px;
     color: #888;
 }
 
@@ -684,12 +764,20 @@ body {
     transform: scale(1.1);
 }
 
-.pronunciation {
+/* 翻译结果区域的发音样式（不影响单词本） */
+.result-content .pronunciation {
     display: flex;
     align-items: center;
     margin-top: 10px;
     color: #666;
     font-size: 14px;
+    gap: 8px;
+}
+
+.result-content .phonetic-text {
+    font-family: 'Times New Roman', serif;
+    font-size: 16px;
+    color: #888;
 }
 
 .speaker-btn {
@@ -757,36 +845,7 @@ body {
     box-sizing: border-box;
 }
 
-.word-item {
-    background-color: white;
-    border-radius: 15px;
-    padding: 15px;
-    text-align: center;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
-    transition: all 0.3s;
-    cursor: pointer;
-}
-
-.word-item:hover {
-    transform: translateY(-5px);
-}
-
-.word-item .word {
-    font-weight: bold;
-    font-size: 16px;
-    margin-bottom: 5px;
-}
-
-.word-item .meaning {
-    font-size: 14px;
-    color: #888;
-}
-
-.stars {
-    display: flex;
-    justify-content: center;
-    margin-top: 10px;
-}
+/* 重复的.word-item定义已删除，使用上面的完整定义 */
 
 .star {
     color: #ddd;

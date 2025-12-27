@@ -349,24 +349,91 @@ class WendyApp {
     // 显示翻译结果
     displayTranslationResult(result) {
         const resultContent = document.querySelector('.result-content');
+        
+        // 构建词性显示（如果有）
+        const partOfSpeechHtml = result.part_of_speech 
+            ? `<div class="part-of-speech">${result.part_of_speech}</div>` 
+            : '';
+        
+        // 构建音标和发音按钮（如果是句子且没有音标，也显示朗读按钮）
+        const pronunciationHtml = result.pronunciation 
+            ? `<div class="pronunciation">
+                <span class="phonetic-text">${result.pronunciation}</span>
+                ${result.audio_url 
+                    ? `<div class="speaker-btn" title="播放发音" data-audio-url="${result.audio_url.replace(/"/g, '&quot;')}">
+                        <i class="fas fa-volume-up"></i>
+                    </div>`
+                    : `<div class="speaker-btn" title="朗读" data-word="${(result.original_text || '').replace(/"/g, '&quot;')}">
+                        <i class="fas fa-volume-up"></i>
+                    </div>`
+                }
+            </div>` 
+            : (result.original_text && result.original_text.trim().split(/\s+/).length > 1 
+                ? `<div class="pronunciation">
+                    <div class="speaker-btn" title="朗读句子" data-word="${(result.original_text || '').replace(/"/g, '&quot;')}">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                </div>`
+                : '');
+        
+        // 构建例句显示（英文例句末端添加小喇叭）
+        const exampleHtml = result.example_sentence 
+            ? `<div class="example-sentence">
+                <div class="example-en">
+                    ${result.example_sentence}
+                    ${result.example_audio_url 
+                        ? `<div class="example-speaker-btn" title="播放例句发音" data-audio-url="${result.example_audio_url.replace(/"/g, '&quot;')}">
+                            <i class="fas fa-volume-up"></i>
+                        </div>`
+                        : `<div class="example-speaker-btn" title="朗读例句" data-text="${(result.example_sentence || '').replace(/"/g, '&quot;')}">
+                            <i class="fas fa-volume-up"></i>
+                        </div>`
+                    }
+                </div>
+                ${result.example_translation ? `<div class="example-zh">${result.example_translation}</div>` : ''}
+            </div>` 
+            : '';
+        
         resultContent.innerHTML = `
             <div class="translation-item">
                 <div class="add-to-wordbook" title="添加到单词本" onclick="wendyApp.handleAddToWordbook()">
                     <i class="fas fa-plus"></i>
                 </div>
-                <div class="original-text">${result.original_text}</div>
-                <div class="translated-text">${result.translated_text}</div>
-                <div class="pronunciation">
-                    ${result.pronunciation || ''}
-                    <div class="speaker-btn" title="朗读" onclick="wendyApp.speakText('${result.original_text}')">
-                        <i class="fas fa-volume-up"></i>
-                    </div>
-                </div>
-                ${result.example_sentence ? `
-                <div class="example-sentence">${result.example_sentence}${result.example_translation ? ' ' + result.example_translation : ''}</div>
-                ` : ''}
+                <div class="original-text">${result.original_text || ''}</div>
+                ${partOfSpeechHtml}
+                <div class="translated-text">${result.translated_text || ''}</div>
+                ${pronunciationHtml}
+                ${exampleHtml}
             </div>
         `;
+        
+        // 绑定发音按钮事件
+        const speakerBtn = resultContent.querySelector('.speaker-btn');
+        if (speakerBtn) {
+            if (result.audio_url) {
+                speakerBtn.addEventListener('click', () => {
+                    this.playAudio(result.audio_url);
+                });
+            } else if (result.original_text) {
+                speakerBtn.addEventListener('click', () => {
+                    this.speakText(result.original_text);
+                });
+            }
+        }
+        
+        // 绑定例句发音按钮事件
+        const exampleSpeakerBtn = resultContent.querySelector('.example-speaker-btn');
+        if (exampleSpeakerBtn) {
+            const audioUrl = exampleSpeakerBtn.getAttribute('data-audio-url');
+            const text = exampleSpeakerBtn.getAttribute('data-text');
+            exampleSpeakerBtn.addEventListener('click', () => {
+                if (audioUrl) {
+                    this.playAudio(audioUrl);
+                } else if (text) {
+                    this.speakText(text);
+                }
+            });
+        }
         
         // 保存当前翻译结果到实例
         this.currentTranslation = result;
@@ -544,16 +611,30 @@ class WendyApp {
         masteredWords.forEach(word => {
             const wordDiv = document.createElement('div');
             wordDiv.className = 'mastered-word-item';
-            // 只有当音标存在且不为空时才显示音标行
+            
+            // 构建音标（如果有）
             const pronunciationHtml = word.pronunciation && word.pronunciation.trim() 
                 ? `<div class="word-pronunciation">${word.pronunciation}</div>` 
                 : '';
+            
             wordDiv.innerHTML = `
+                <div class="mastered-word-speak" data-word="${word.english_word.replace(/"/g, '&quot;')}" title="朗读">
+                    <i class="fas fa-volume-up"></i>
+                </div>
                 <div class="word-text">${word.english_word}</div>
                 ${pronunciationHtml}
                 <div class="word-meaning">${word.chinese_meaning}</div>
             `;
             masteredContainer.appendChild(wordDiv);
+        });
+        
+        // 绑定发音按钮事件
+        masteredContainer.querySelectorAll('.mastered-word-speak').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const word = btn.getAttribute('data-word');
+                this.speakWord(word);
+            });
         });
     }
 
@@ -811,13 +892,53 @@ class WendyApp {
         }
     }
 
-    // 语音朗读
+    // 播放音频（优先使用金山词霸的MP3）
+    playAudio(audioUrl) {
+        if (!audioUrl) {
+            this.showNotification('没有可用的音频', 'warning');
+            return;
+        }
+        
+        try {
+            const audio = new Audio(audioUrl);
+            const volumeSlider = document.getElementById('volume-slider');
+            audio.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+            
+            audio.onerror = () => {
+                console.error('音频加载失败:', audioUrl);
+                this.showNotification('音频播放失败，尝试使用语音合成', 'warning');
+                // 如果MP3播放失败，尝试使用语音合成
+                if (this.currentTranslation && this.currentTranslation.original_text) {
+                    this.speakText(this.currentTranslation.original_text);
+                }
+            };
+            
+            audio.play().catch(error => {
+                console.error('音频播放失败:', error);
+                this.showNotification('无法播放音频', 'warning');
+            });
+        } catch (error) {
+            console.error('创建音频对象失败:', error);
+            this.showNotification('音频播放失败', 'warning');
+        }
+    }
+    
+    // 语音朗读（使用Web Speech API）
     speakText(text) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        const volumeSlider = document.getElementById('volume-slider');
-        utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
-        speechSynthesis.speak(utterance);
+        if (!text) {
+            this.showNotification('没有可朗读的文本', 'warning');
+            return;
+        }
+        
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            const volumeSlider = document.getElementById('volume-slider');
+            utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+            speechSynthesis.speak(utterance);
+        } else {
+            this.showNotification('您的浏览器不支持语音朗读', 'warning');
+        }
     }
 
     // 模拟语音输入

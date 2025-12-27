@@ -148,7 +148,13 @@ def start_backend():
     try:
         # 在新线程中启动Flask应用
         def run_flask():
-            subprocess.call([sys.executable, "backend/core/app.py"])
+            # 使用 -u 参数禁用输出缓冲，确保日志实时显示
+            env = os.environ.copy()
+            env['PYTHONUNBUFFERED'] = '1'
+            subprocess.call(
+                [sys.executable, "-u", "backend/core/app.py"],
+                env=env
+            )
         
         flask_thread = threading.Thread(target=run_flask)
         flask_thread.daemon = True

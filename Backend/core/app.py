@@ -16,6 +16,17 @@ if sys.platform == 'win32':
     except:
         pass
 
+# 禁用输出缓冲，确保日志实时显示
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(line_buffering=True)
+except:
+    # 如果reconfigure不可用，尝试设置环境变量
+    import os
+    os.environ['PYTHONUNBUFFERED'] = '1'
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
@@ -246,9 +257,13 @@ def translate_text():
             'success': True,
             'original_text': text,
             'translated_text': cached_result['translated_text'],
+            'part_of_speech': '',  # 缓存中暂不存储词性
             'pronunciation': cached_result['pronunciation'],
             'example_sentence': cached_result['example_sentence'],
             'example_translation': cached_result['example_translation'],
+            'audio_url': '',  # 缓存中暂不存储audio_url，需要时重新获取
+            'example_audio_url': '',  # 缓存中暂不存储example_audio_url，需要时重新获取
+            'source': 'cache',
             'from_cache': True
         })
     
@@ -274,11 +289,15 @@ def translate_text():
         
         return jsonify({
             'success': True,
-            'original_text': text,
+            'original_text': translation_result.get('original_text', text),
             'translated_text': translation_result['translated_text'],
+            'part_of_speech': translation_result.get('part_of_speech', ''),
             'pronunciation': translation_result.get('pronunciation', ''),
             'example_sentence': translation_result.get('example_sentence', ''),
             'example_translation': translation_result.get('example_translation', ''),
+            'audio_url': translation_result.get('audio_url', ''),
+            'example_audio_url': translation_result.get('example_audio_url', ''),
+            'source': translation_result.get('source', 'unknown'),
             'from_cache': False
         })
     else:
