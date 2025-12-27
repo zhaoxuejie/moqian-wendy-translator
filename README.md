@@ -6,11 +6,21 @@
 
 ### 核心功能
 - 🔄 **智能翻译** - 英中文本互译，支持多种输入方式
-- 🤖 **AI对话助手** - 集成DeepSeek AI，提供智能问答和学习辅导
+  - 🏆 **金山词霸优先** - 单个英文单词优先使用金山词霸，提供详细词典信息
+  - 📖 **完整词典信息** - 词性、美式音标、发音音频、例句及例句翻译
+  - 🔄 **智能备用** - 金山词霸无结果时自动切换到有道翻译
+  - 🔊 **音频播放** - 支持单词发音和例句发音播放
+- 🤖 **AI对话助手（小语）** - 集成DeepSeek AI，温蒂的英语学习小伙伴和智能翻译助手
 - 📚 **单词本管理** - 保存、复习、掌握程度跟踪
 - 📊 **学习进度** - 详细的学习统计和里程碑
+  - 📅 **连续学习天数** - 从今天往前统计连续学习天数
+  - 🏆 **成就徽章** - 总掌握单词数 × 3 枚徽章
+  - 📈 **本月掌握** - 统计当月达到3星掌握的单词数
+  - 📊 **总计掌握** - 统计所有达到3星掌握的单词总数
 - 🏆 **成就系统** - 激励学习的徽章和奖励
 - 🎨 **个性化界面** - 多主题、头像、语言切换
+- 🎤 **语音设置** - 支持中英文语音切换，简短昵称显示（小柔、小星、小莹等）
+- 💬 **鼓励消息** - 随机显示鼓励话语，激励学习
 
 ### 技术特性
 - 💾 **SQLite数据库** - 轻量级本地数据存储
@@ -18,33 +28,53 @@
 - 🤖 **DeepSeek集成** - 强大的AI对话和学习辅助
 - 🎯 **响应式设计** - 适配各种设备
 - 🔊 **语音朗读** - 发音练习功能
+  - 🎵 **Web Speech API** - 浏览器原生语音合成
+  - 🎤 **语音选择** - 支持选择中英文语音，显示简短昵称
+  - 🔊 **音频播放** - 支持MP3音频播放（金山词霸、有道翻译）
 - ⚡ **实时缓存** - 提升翻译性能
 - 🔧 **模块化架构** - 清晰的前后端分离设计
+- 📝 **实时日志** - 翻译服务日志实时输出，便于调试
 
 ## 🏗️ 项目架构
 
 ```
 wendy-translator/
-├── 📱 frontend/               # 前端文件
+├── 📱 Frontend/               # 前端文件（注意：实际目录名为Frontend）
 │   ├── index.html           # 主页面
 │   ├── api.js               # API客户端和核心逻辑
+│   │                         # - 翻译结果显示
+│   │                         # - 语音设置管理
+│   │                         # - 学习进度统计
+│   │                         # - AI对话处理
 │   ├── style.css            # 样式表
 │   ├── chat_test.html       # 聊天功能测试页面
 │   └── img/                 # 图片资源
 │       ├── kenan.jpg        # 柯南头像
 │       ├── xiaowanzi.jpg    # 小丸子头像
 │       └── duola.jpg        # 哆啦A梦头像
-├── 🖥️ backend/               # 后端文件
+├── 🖥️ Backend/               # 后端文件（注意：实际目录名为Backend）
 │   ├── core/                # 核心应用
 │   │   ├── app.py          # Flask主服务器
+│   │   │                   # - RESTful API路由
+│   │   │                   # - 学习进度统计
+│   │   │                   # - 用户资料管理
+│   │   │                   # - 鼓励消息API
 │   │   └── config.py       # 配置管理
 │   ├── database/            # 数据库相关
 │   │   ├── database_init.py # 数据库初始化
+│   │   │                   # - 创建数据表
+│   │   │                   # - 添加新字段（audio_url, voice_name等）
 │   │   └── wendy_translator.db # SQLite数据库
 │   ├── services/            # 服务层
 │   │   ├── translation_service.py # 翻译服务
+│   │   │                       # - 金山词霸集成
+│   │   │                       # - 有道翻译备用
+│   │   │                       # - 音频URL提取
+│   │   │                       # - 例句提取
 │   │   ├── deepseek_service.py # DeepSeek AI服务
-│   │   ├── configure_api.py # API配置工具
+│   │   │                       # - AI角色定义（小语）
+│   │   ├── configure_api.py # 百度API配置工具
+│   │   ├── configure_youdao_api.py # 有道API配置工具
 │   │   └── deepseek_config.json # DeepSeek配置文件
 │   ├── utils/               # 工具函数
 │   │   ├── fix_translation.py # 翻译修复工具
@@ -53,9 +83,13 @@ wendy-translator/
 │       ├── test_api.py      # API测试
 │       ├── test_translation_logs.py # 翻译日志测试
 │       └── test_*.py        # 其他测试文件
-├── ⚙️ config/                # 配置文件
+├── ⚙️ Config/                # 配置文件（注意：实际目录名为Config）
 │   ├── requirements.txt     # Python依赖
 │   ├── start_app.py         # 启动脚本
+│   │                         # - 依赖检查
+│   │                         # - 数据库初始化
+│   │                         # - API配置
+│   │                         # - 实时日志输出
 │   └── start_app_old.py     # 旧版启动脚本
 ├── 📊 report/                # 项目报告
 │   ├── 项目结构说明.md      # 项目结构文档
@@ -122,8 +156,18 @@ python app.py
 ### 基础翻译
 1. 在输入框输入英文单词或句子
 2. 点击"开始翻译"按钮
-3. 查看翻译结果和例句
-4. 点击喇叭图标听发音
+3. 查看翻译结果，包含：
+   - **原单词** - 输入的英文单词
+   - **词性** - 单词的词性（名词、动词等）
+   - **词意** - 中文翻译
+   - **美式音标** - 美式英语音标标注
+   - **发音按钮** - 点击小喇叭图标播放单词发音
+   - **例句** - 英文例句及中文翻译
+   - **例句发音** - 点击例句旁的小喇叭播放例句音频
+4. **翻译策略**：
+   - 单个英文单词：优先使用金山词霸，提供完整词典信息
+   - 句子或短语：使用有道翻译API
+   - 自动备用：金山词霸无结果时自动切换到有道翻译
 
 ### 单词本管理
 1. 翻译后点击"添加到单词本"
@@ -133,32 +177,64 @@ python app.py
 
 ### 个性化设置
 1. 点击右上角头像打开设置
-2. **更换头像**: 选择喜欢的角色头像
-3. **更换主题**: 粉色、蓝色、紫色、绿色
-4. **语言设置**: 中文/英文界面
+2. **更换头像**: 选择喜欢的角色头像（柯南、小丸子、哆啦A梦）
+3. **更换主题**: 粉色、蓝色、紫色、绿色四种主题
+4. **语言设置**: 中文/英文界面切换
+   - 切换语言时，所有界面文本（包括语音设置）都会同步更新
 5. **音效设置**: 调节朗读音量
+6. **语音设置**: 选择AI语音朗读的声音
+   - 支持中英文语音分类显示
+   - 语音选项显示为简短昵称（如：小柔、小星、小莹等）
+   - 鼠标悬停显示完整语音名称
+   - 支持中英文界面切换
 
-### AI对话助手 (DeepSeek)
+### AI对话助手 (小语)
 1. 切换到"对话"标签页
 2. 输入英语学习问题或想要探讨的内容
-3. AI助手提供详细解答和个性化辅导
+3. **小语**（温蒂的英语学习小伙伴和智能翻译助手）提供详细解答和个性化辅导
 4. 支持连续对话和上下文理解
 5. 提供英语学习建议和语法解释
+6. 支持语音朗读AI回复（点击消息旁的小喇叭图标）
 
 #### 使用示例
 - "请解释apple这个单词的用法"
 - "帮我分析这个英语句子的语法"
 - "我想学习关于水果的英语单词"
 
+#### 小语的特点
+- 名字：小语（不是温蒂，温蒂是用户）
+- 角色：温蒂的英语学习小伙伴和智能翻译助手
+- 风格：像好朋友一样陪伴学习，提供鼓励和支持
+
 ### 学习跟踪
 1. 查看"成长记录"了解学习统计
-2. 连续学习天数、单词掌握数
-3. 成就徽章激励持续学习
+2. **连续学习天数** - 从今天往前统计连续学习的天数
+3. **成就徽章** - 总掌握单词数 × 3 枚徽章（每掌握一个单词获得3枚徽章）
+4. **本月掌握** - 统计当月达到3星掌握的单词数量
+5. **总计掌握** - 统计所有达到3星掌握的单词总数
+6. **我的单词** - 查看所有已掌握的单词（3星单词）
+   - 每个单词卡片右上角有发音按钮
+   - 支持点击播放单词发音
+7. **鼓励消息** - 页面顶部随机显示鼓励话语，激励学习
 
 ## 🔧 API 接口
 
 ### 翻译服务
-- `POST /api/translate` - 文本翻译（支持百度、有道等多种API）
+- `POST /api/translate` - 文本翻译
+  - **翻译策略**：
+    - 单个英文单词：优先使用金山词霸API，提供完整词典信息
+    - 句子或短语：使用有道翻译API
+    - 自动备用：金山词霸无结果时自动切换到有道翻译
+  - **返回字段**：
+    - `original_text` - 原文本
+    - `translated_text` - 翻译结果
+    - `part_of_speech` - 词性
+    - `pronunciation` - 美式音标
+    - `audio_url` - 单词发音音频URL
+    - `example_sentence` - 英文例句
+    - `example_translation` - 例句翻译
+    - `example_audio_url` - 例句发音音频URL
+    - `source` - 翻译来源（iciba/youdao/baidu等）
 - `POST /api/translate/baidu` - 百度翻译专用接口
 - `POST /api/translate/youdao` - 有道翻译专用接口
 
@@ -180,8 +256,14 @@ python app.py
 
 ### 学习进度
 - `GET /api/progress` - 获取学习统计
+  - `streak_days` - 连续学习天数（从今天往前统计）
+  - `achievements_count` - 成就徽章数（总掌握单词数 × 3）
+  - `words_this_month` - 本月掌握的单词数（3星单词）
+  - `total_mastered_words` - 总计掌握的单词数（所有3星单词）
+  - `mastered_words` - 已掌握的单词列表
 - `GET /api/achievements` - 获取成就列表
 - `GET /api/progress/daily` - 获取每日学习数据
+- `GET /api/encouragement` - 获取随机鼓励消息
 
 ### 系统配置
 - `GET /api/config/translation` - 获取翻译API配置
@@ -192,9 +274,12 @@ python app.py
 
 ### 用户表 (users)
 - 用户基本信息和设置
+- `voice_name` - 用户选择的语音名称
+- `voice_lang` - 用户选择的语音语言（zh/en）
 
 ### 单词本 (wordbook)
 - 保存的单词和掌握程度
+- `audio_url` - 单词发音音频URL（支持金山词霸和有道翻译的音频）
 
 ### 翻译历史 (translation_history)
 - 所有翻译记录
@@ -207,6 +292,9 @@ python app.py
 
 ### 翻译缓存 (translation_cache)
 - 翻译结果缓存
+- `audio_url` - 单词发音音频URL
+- `example_audio_url` - 例句发音音频URL
+- `part_of_speech` - 词性
 
 ## 🎨 界面设计
 
@@ -237,20 +325,54 @@ python app.py
 
 2. 在 `backend/services/deepseek_service.py` 中自定义AI行为：
 ```python
-# 自定义系统提示词
-SYSTEM_PROMPT = """你是温蒂的英语学习助手，专门帮助小朋友学习英语。
-请用简单易懂的语言回答问题，提供学习建议和鼓励。"""
+# AI角色定义
+SYSTEM_PROMPT = """你是小语，温蒂的英语学习小伙伴和智能翻译助手。
+你是温蒂的学习伙伴，要像好朋友一样陪伴她学习。
+记住你的名字是小语。"""
 ```
 
-### 添加新翻译API
+### 语音设置配置
+- **语音昵称映射**: 在 `frontend/api.js` 的 `WendyApp` 类中配置 `voiceNicknames` 对象
+- **昵称池**: 在 `nicknamePool` 数组中添加更多简短昵称
+- **多语言支持**: 在 `frontend/index.html` 的 `translations` 对象中添加语音设置相关文本
+
+### 翻译服务架构
+
+#### 金山词霸集成
+- **API地址**: `https://www.iciba.com/_next/data/0uoz6g5Mqy_2ryPPl06a0/word.json?w={word}`
+- **数据提取**:
+  - 音标：`baesInfo.symbols.ph_am`（美式音标）
+  - 音频URL：`baesInfo.symbols.ph_am_mp3`
+  - 词性：`baesInfo.symbols.parts[0].part`
+  - 词意：`baesInfo.symbols.parts[0].means[0]`
+  - 例句：`new_sentence[0].sentences[0].en`（英文）和 `cn`（中文）
+  - 例句音频：`new_sentence[0].sentences[0].ttsUrl`
+- **使用策略**: 仅对单个英文单词使用，提供完整词典信息
+
+#### 有道翻译集成
+- **备用策略**: 当金山词霸无结果时自动使用
+- **支持功能**: 句子翻译、短语翻译
+- **音频支持**: 支持句子音频播放
+
+#### 添加新翻译API
 在 `backend/services/translation_service.py` 中集成翻译服务：
 ```python
 # 示例：集成新的翻译API
-class NewTranslationService(TranslationService):
-    def call_translation_api(self, text, source_lang, target_lang):
-        # 调用新API
-        # 返回标准格式结果
-        pass
+def _translate_new_api(self, text, from_lang, to_lang):
+    """新翻译API实现"""
+    # 调用新API
+    # 返回标准格式结果，必须包含以下字段：
+    return {
+        'original_text': text,
+        'translated_text': '翻译结果',
+        'part_of_speech': '',  # 词性
+        'pronunciation': '',   # 音标
+        'audio_url': '',       # 单词音频URL
+        'example_sentence': '', # 例句
+        'example_translation': '', # 例句翻译
+        'example_audio_url': '', # 例句音频URL
+        'source': 'new_api'    # 来源标识
+    }
 ```
 
 ### 扩展数据库
@@ -300,6 +422,9 @@ await wendyApp.handleAddToWordbook();
 - 查看控制台错误信息
 - 验证翻译API密钥配置（百度、有道等）
 - 检查 `backend/services/` 中的配置文件
+- **金山词霸无结果**：系统会自动切换到有道翻译，这是正常行为
+- **音标或例句缺失**：某些单词可能没有完整信息，系统会尽量补充
+- **音频播放失败**：会自动降级到Web Speech API进行语音合成
 
 ### AI对话功能异常
 - 验证DeepSeek API密钥是否正确配置
@@ -316,6 +441,17 @@ await wendyApp.handleAddToWordbook();
 - 确认数据库文件存在 (`backend/database/wendy_translator.db`)
 - 检查文件权限
 - 重新初始化数据库：`python backend/database/database_init.py`
+
+### 语音设置问题
+- **语音选项不显示**：确认浏览器支持Web Speech API（Chrome、Edge、Safari等）
+- **语音昵称不显示**：检查 `frontend/api.js` 中的 `voiceNicknames` 映射表
+- **语音设置文本未切换**：确认 `frontend/index.html` 中的 `translations` 对象包含语音相关文本
+
+### 学习进度统计问题
+- **连续学习天数不正确**：系统从今天往前统计，确保每天都有学习记录
+- **成就徽章数量**：计算公式为 `总掌握单词数 × 3`
+- **本月掌握单词数**：只统计当月达到3星掌握的单词
+- **总计掌握单词数**：统计所有达到3星掌握的单词
 
 ## 🧪 测试和调试
 
@@ -341,6 +477,18 @@ await wendyApp.handleAddToWordbook();
 - 数据库索引优化查询性能
 
 ## 📈 更新日志
+
+### v1.3.0 (2024-12-27)
+- ✅ **金山词霸集成** - 单个英文单词优先使用金山词霸，提供完整词典信息
+- ✅ **详细翻译结果** - 显示词性、美式音标、发音音频、例句及例句翻译
+- ✅ **音频播放功能** - 支持单词发音和例句发音播放（MP3音频）
+- ✅ **学习进度优化** - 连续学习天数、成就徽章（总掌握×3）、本月掌握、总计掌握
+- ✅ **语音设置功能** - 支持中英文语音切换，简短昵称显示（小柔、小星、小莹等）
+- ✅ **鼓励消息** - 随机显示鼓励话语，激励学习
+- ✅ **AI角色优化** - DeepSeek AI角色名称改为"小语"，作为温蒂的学习小伙伴
+- ✅ **多语言支持** - 语音设置支持中英文界面切换
+- ✅ **实时日志** - 翻译服务日志实时输出，便于调试
+- ✅ **编码优化** - 修复Windows下的Unicode编码问题
 
 ### v1.2.0 (2024-11-29)
 - ✅ DeepSeek AI对话集成
