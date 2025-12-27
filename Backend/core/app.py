@@ -5,16 +5,28 @@
 Flask API服务器
 """
 
+import sys
+import io
+
+# 设置输出编码为UTF-8（Windows控制台支持）
+if sys.platform == 'win32':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except:
+        pass
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import os
 import os
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import hashlib
 import requests
 import time
+import random
 from functools import wraps
 import sys
 import os
@@ -32,6 +44,30 @@ SECRET_KEY = 'wendy-translator-secret-key-2024'
 
 # 导入DeepSeek服务
 from services.deepseek_service import deepseek_service
+
+# 鼓励话语列表
+ENCOURAGEMENT_MESSAGES = [
+    "亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！",
+    "温蒂，你的努力让爸爸非常感动！继续加油！",
+    "宝贝，你每天都在进步，爸爸为你感到自豪！",
+    "温蒂，你的坚持和努力是最棒的！爸爸爱你！",
+    "亲爱的温蒂，看到你认真学习的样子，爸爸心里暖暖的！",
+    "温蒂，你真的很棒！爸爸相信你会越来越优秀！",
+    "宝贝，你的每一个进步都是爸爸最大的快乐！",
+    "温蒂，你认真学习的样子真美！爸爸为你骄傲！",
+    "亲爱的温蒂，你的努力不会白费，爸爸永远支持你！",
+    "温蒂，你是爸爸的骄傲！继续加油，你是最棒的！",
+    "宝贝，看到你一天天进步，爸爸心里满满的幸福！",
+    "温蒂，你的坚持让爸爸看到了你的成长！真棒！",
+    "亲爱的温蒂，你的努力让爸爸非常感动！继续加油！",
+    "温蒂，你认真学习的样子是爸爸眼中最美的风景！",
+    "宝贝，你的每一个进步都让爸爸为你感到骄傲！",
+    "温蒂，你是爸爸心中最棒的小宝贝！继续努力！",
+    "亲爱的温蒂，你的坚持和努力是最珍贵的品质！",
+    "温蒂，看到你认真学习，爸爸心里满满的幸福感！",
+    "宝贝，你的进步让爸爸看到了你的无限可能！",
+    "温蒂，你是爸爸的骄傲！继续加油，未来可期！"
+]
 
 # 配置翻译API
 try:
@@ -448,43 +484,79 @@ def get_learning_progress():
         WHERE user_id = ?
     ''', (user['id'],), one=True)
     
-    # 获取连续学习天数
-    streak_days = query_db('''
-        SELECT COUNT(*) as streak_count
-        FROM learning_progress 
-        WHERE user_id = ? 
-        AND learn_date >= date('now', '-7 days')
+    # 1. 获取连续学习天数（从今天往前连续统计）
+    # 思路：从今天开始往前检查，直到遇到没有学习记录的那天
+    streak_days = 0
+    check_date = date.today()
+    max_check_days = 365  # 最多检查365天，避免无限循环
+    checked_days = 0
+    
+    while checked_days < max_check_days:
+        # 检查这一天是否有学习记录（翻译记录或单词本操作）
+        has_activity = query_db('''
+            SELECT COUNT(*) as count FROM learning_progress 
+            WHERE user_id = ? AND learn_date = ?
+        ''', (user['id'], check_date.isoformat()), one=True)
+        
+        if has_activity and has_activity['count'] > 0:
+            streak_days += 1
+            check_date = check_date - timedelta(days=1)
+            checked_days += 1
+        else:
+            break
+    
+    # 2. 统计掌握单词数（mastery_level = 3）
+    mastered_words_stats = query_db('''
+        SELECT COUNT(*) as count
+        FROM wordbook 
+        WHERE user_id = ? AND mastery_level = 3
     ''', (user['id'],), one=True)
     
-    # 获取本月学习统计
-    monthly_stats = query_db('''
+    mastered_words_count = mastered_words_stats['count'] if mastered_words_stats and mastered_words_stats['count'] is not None else 0
+    print(f"📊 掌握单词数统计: user_id={user['id']}, mastered_words_count={mastered_words_count}")
+    
+    # 3. 统计本月掌握的单词数（mastery_level = 3 且本月达到3星）
+    # 注意：这里统计的是本月达到3星的单词，检查 last_reviewed 是本月
+    monthly_mastered_stats = query_db('''
+        SELECT COUNT(*) as count
+        FROM wordbook 
+        WHERE user_id = ? 
+        AND mastery_level = 3
+        AND strftime('%Y-%m', last_reviewed) = strftime('%Y-%m', 'now')
+    ''', (user['id'],), one=True)
+    
+    monthly_mastered_count = monthly_mastered_stats['count'] if monthly_mastered_stats and monthly_mastered_stats['count'] is not None else 0
+    
+    # 4. 成就勋章数量 = 掌握单词数 × 3
+    achievements_count = mastered_words_count * 3
+    
+    # 获取本月学习时间（从 learning_progress 表）
+    monthly_time = query_db('''
         SELECT 
-            COUNT(*) as words_this_month,
             SUM(time_spent) as time_this_month
         FROM learning_progress 
         WHERE user_id = ? 
         AND strftime('%Y-%m', learn_date) = strftime('%Y-%m', 'now')
     ''', (user['id'],), one=True)
     
-    # 获取成就数量
-    achievement_count = query_db(
-        'SELECT COUNT(*) as count FROM achievements WHERE user_id = ?',
-        (user['id'],),
-        one=True
-    )
+    # 确保所有值都有默认值，避免 None 错误
+    progress_data = {
+        'total_words': stats['total_words'] if stats and stats['total_words'] is not None else 0,
+        'mastered_words': stats['mastered_words'] if stats and stats['mastered_words'] is not None else 0,
+        'total_reviews': stats['total_reviews'] if stats and stats['total_reviews'] is not None else 0,
+        'streak_days': streak_days,  # 连续学习天数
+        'words_this_month': monthly_mastered_count,  # 本月掌握的单词数
+        'total_mastered_words': mastered_words_count,  # 总计掌握的单词数
+        'time_this_month': monthly_time['time_this_month'] if monthly_time and monthly_time['time_this_month'] is not None else 0,
+        'achievements_count': achievements_count,  # 成就勋章数量 = 掌握单词数 × 3
+        'last_study_date': stats['last_study_date'] if stats else None
+    }
+    
+    print(f"📊 返回进度数据: total_mastered_words={progress_data['total_mastered_words']}, achievements_count={progress_data['achievements_count']}")
     
     return jsonify({
         'success': True,
-        'progress': {
-            'total_words': stats['total_words'] or 0,
-            'mastered_words': stats['mastered_words'] or 0,
-            'total_reviews': stats['total_reviews'] or 0,
-            'streak_days': streak_days['streak_count'] or 0,
-            'words_this_month': monthly_stats['words_this_month'] or 0,
-            'time_this_month': monthly_stats['time_this_month'] or 0,
-            'achievements_count': achievement_count['count'] or 0,
-            'last_study_date': stats['last_study_date']
-        }
+        'progress': progress_data
     })
 
 @app.route('/api/achievements', methods=['GET'])
@@ -518,6 +590,19 @@ def get_achievements():
         'success': True,
         'achievements': achievement_list,
         'total': len(achievement_list)
+    })
+
+# ====== 鼓励话语 API ======
+@app.route('/api/encouragement', methods=['GET'])
+@handle_errors
+def get_encouragement():
+    """获取随机鼓励话语"""
+    # 随机选择一条鼓励话语
+    message = random.choice(ENCOURAGEMENT_MESSAGES)
+    
+    return jsonify({
+        'success': True,
+        'message': message
     })
 
 # ====== 辅助函数 ======

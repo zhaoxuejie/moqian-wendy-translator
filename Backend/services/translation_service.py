@@ -36,14 +36,20 @@ class TranslationService:
         self.baidu_appid = appid
         self.baidu_secret = secret
         self.current_service = "baidu"
-        print("✅ 已配置百度翻译API")
+        try:
+            print("✅ 已配置百度翻译API")
+        except (UnicodeEncodeError, ValueError, OSError):
+            print("已配置百度翻译API")
         
     def set_youdao_config(self, app_key: str, app_secret: str):
         """设置有道翻译配置"""
         self.youdao_app_key = app_key
         self.youdao_app_secret = app_secret
         self.current_service = "youdao"
-        print("✅ 已配置有道翻译API")
+        try:
+            print("✅ 已配置有道翻译API")
+        except (UnicodeEncodeError, ValueError, OSError):
+            print("已配置有道翻译API")
         
     def translate(self, text: str, from_lang: str = "auto", to_lang: str = "zh") -> Dict:
         """

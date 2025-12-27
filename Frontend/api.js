@@ -115,6 +115,11 @@ class WendyAPI {
             })
         });
     }
+
+    // ====== 鼓励话语 ======
+    async getEncouragement() {
+        return await this.request('/api/encouragement');
+    }
 }
 
 // 创建全局API实例
@@ -133,6 +138,9 @@ class WendyApp {
     // 初始化应用
     async init() {
         try {
+            // 先显示默认值（0），避免显示HTML中写死的数字
+            this.updateProgressDisplay();
+            
             await this.loadUserProfile();
             await this.loadWordbook();
             await this.loadLearningProgress();
@@ -142,6 +150,8 @@ class WendyApp {
         } catch (error) {
             console.error('❌ 应用初始化失败:', error);
             this.showNotification('应用初始化失败，请检查网络连接', 'error');
+            // 即使初始化失败，也显示默认值
+            this.updateProgressDisplay();
         }
     }
 
@@ -178,11 +188,46 @@ class WendyApp {
             const response = await this.api.getLearningProgress();
             if (response.success) {
                 this.learningProgress = response.progress;
-                this.updateProgressDisplay();
                 console.log('学习进度加载成功:', this.learningProgress);
+                console.log('成就数量:', this.learningProgress.achievements_count);
+                console.log('本月单词数:', this.learningProgress.words_this_month);
+                this.updateProgressDisplay();
+            } else {
+                // 如果API返回失败，使用默认值
+                console.warn('API返回失败，使用默认值');
+                this.learningProgress = null;
+                this.updateProgressDisplay();
             }
+            
+            // 加载随机鼓励话语
+            await this.loadEncouragement();
         } catch (error) {
             console.error('加载学习进度失败:', error);
+            // 加载失败时也显示默认值
+            this.learningProgress = null;
+            this.updateProgressDisplay();
+            // 即使失败也尝试加载鼓励话语
+            await this.loadEncouragement();
+        }
+    }
+
+    // 加载随机鼓励话语
+    async loadEncouragement() {
+        try {
+            const response = await this.api.getEncouragement();
+            if (response.success) {
+                const encouragementText = document.getElementById('encouragement-text');
+                if (encouragementText) {
+                    encouragementText.textContent = response.message;
+                }
+            }
+        } catch (error) {
+            console.error('加载鼓励话语失败:', error);
+            // 失败时使用默认话语
+            const encouragementText = document.getElementById('encouragement-text');
+            if (encouragementText) {
+                encouragementText.textContent = '亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！';
+            }
         }
     }
 
@@ -399,9 +444,18 @@ class WendyApp {
             wordbookContainer.appendChild(wordItem);
         });
 
-        // 添加分页控件
+        // 移除旧的分页控件（如果存在）
+        const oldPagination = document.getElementById('wordbook-pagination');
+        if (oldPagination) {
+            oldPagination.remove();
+        }
+
+        // 添加分页控件到容器外部
         if (totalPages > 1) {
-            this.addPaginationControls(wordbookContainer, totalPages);
+            const wordbookTab = document.getElementById('wordbook-tab');
+            if (wordbookTab) {
+                this.addPaginationControls(wordbookTab, totalPages);
+            }
         }
 
         // 添加事件监听器
@@ -413,6 +467,7 @@ class WendyApp {
 
     addPaginationControls(container, totalPages) {
         const paginationDiv = document.createElement('div');
+        paginationDiv.id = 'wordbook-pagination';
         paginationDiv.className = 'pagination';
         
         // 上一页按钮
@@ -438,7 +493,13 @@ class WendyApp {
         paginationDiv.appendChild(pageInfo);
         paginationDiv.appendChild(nextBtn);
         
-        container.appendChild(paginationDiv);
+        // 将分页控件插入到 wordbook-container 之后
+        const wordbookContainer = document.getElementById('wordbook-container');
+        if (wordbookContainer && wordbookContainer.nextSibling) {
+            container.insertBefore(paginationDiv, wordbookContainer.nextSibling);
+        } else {
+            container.appendChild(paginationDiv);
+        }
     }
 
     goToPage(page) {
@@ -483,9 +544,13 @@ class WendyApp {
         masteredWords.forEach(word => {
             const wordDiv = document.createElement('div');
             wordDiv.className = 'mastered-word-item';
+            // 只有当音标存在且不为空时才显示音标行
+            const pronunciationHtml = word.pronunciation && word.pronunciation.trim() 
+                ? `<div class="word-pronunciation">${word.pronunciation}</div>` 
+                : '';
             wordDiv.innerHTML = `
                 <div class="word-text">${word.english_word}</div>
-                <div class="word-pronunciation">${word.pronunciation || ''}</div>
+                ${pronunciationHtml}
                 <div class="word-meaning">${word.chinese_meaning}</div>
             `;
             masteredContainer.appendChild(wordDiv);
@@ -548,35 +613,89 @@ class WendyApp {
 
     // 更新进度显示
     updateProgressDisplay() {
-        if (!this.learningProgress) return;
+        // 使用默认值，确保即使数据未加载也显示0
+        const progress = this.learningProgress || {
+            total_words: 0,
+            streak_days: 0,
+            achievements_count: 0,
+            words_this_month: 0,
+            total_mastered_words: 0
+        };
+        
+        console.log('updateProgressDisplay 被调用，progress数据:', progress);
+        console.log('achievements_count:', progress.achievements_count, '类型:', typeof progress.achievements_count);
+        console.log('words_this_month:', progress.words_this_month, '类型:', typeof progress.words_this_month);
 
         // 更新里程碑显示
         const milestoneText = document.getElementById('milestone-text');
         if (milestoneText) {
-            milestoneText.innerHTML = `已学会 <strong>${this.learningProgress.total_words}</strong> 个单词，继续加油！`;
+            const totalWords = progress.total_words || 0;
+            milestoneText.innerHTML = `已学会 <strong>${totalWords}</strong> 个单词，继续加油！`;
         }
 
         // 更新进度条
         const progressBar = document.querySelector('.progress');
         if (progressBar) {
-            const progress = Math.min((this.learningProgress.total_words / 50) * 100, 100);
-            progressBar.style.width = `${progress}%`;
+            const totalWords = progress.total_words || 0;
+            const progressPercent = Math.min((totalWords / 50) * 100, 100);
+            progressBar.style.width = `${progressPercent}%`;
         }
 
         // 更新成长记录
         const streakText = document.getElementById('streak-text');
         if (streakText) {
-            streakText.textContent = `连续学习 ${this.learningProgress.streak_days} 天`;
+            const streakDays = progress.streak_days || 0;
+            streakText.textContent = `连续学习 ${streakDays} 天`;
         }
 
         const badgesText = document.getElementById('badges-text');
         if (badgesText) {
-            badgesText.textContent = `已获得 ${this.learningProgress.achievements_count} 枚成就徽章`;
+            // 确保正确处理 null、undefined、NaN 等情况
+            const achievementsCount = (progress.achievements_count !== null && progress.achievements_count !== undefined) 
+                ? Number(progress.achievements_count) 
+                : 0;
+            const newText = `已获得 ${achievementsCount} 枚成就徽章`;
+            // 使用 innerHTML 确保完全替换内容
+            badgesText.innerHTML = newText;
+            console.log('更新成就徽章显示:', achievementsCount, '元素:', badgesText, '新文本:', newText);
+            console.log('更新后元素内容:', badgesText.innerHTML);
+            // 强制触发重绘
+            badgesText.offsetHeight;
+        } else {
+            console.error('未找到 badges-text 元素');
         }
 
         const monthlyText = document.getElementById('monthly-text');
         if (monthlyText) {
-            monthlyText.textContent = `本月学习 ${this.learningProgress.words_this_month} 个新单词`;
+            // 确保正确处理 null、undefined、NaN 等情况
+            const wordsThisMonth = (progress.words_this_month !== null && progress.words_this_month !== undefined) 
+                ? Number(progress.words_this_month) 
+                : 0;
+            const newText = `本月掌握了 ${wordsThisMonth} 个新单词`;
+            // 使用 innerHTML 确保完全替换内容
+            monthlyText.innerHTML = newText;
+            console.log('更新本月单词数显示:', wordsThisMonth, '元素:', monthlyText, '新文本:', newText);
+            console.log('更新后元素内容:', monthlyText.innerHTML);
+            // 强制触发重绘
+            monthlyText.offsetHeight;
+        } else {
+            console.error('未找到 monthly-text 元素');
+        }
+
+        const totalMasteredText = document.getElementById('total-mastered-text');
+        if (totalMasteredText) {
+            // 确保正确处理 null、undefined、NaN 等情况
+            const totalMasteredWords = (progress.total_mastered_words !== null && progress.total_mastered_words !== undefined) 
+                ? Number(progress.total_mastered_words) 
+                : 0;
+            const newText = `总计掌握了 ${totalMasteredWords} 个新单词`;
+            // 使用 innerHTML 确保完全替换内容
+            totalMasteredText.innerHTML = newText;
+            console.log('更新总计掌握单词数显示:', totalMasteredWords, '元素:', totalMasteredText, '新文本:', newText);
+            // 强制触发重绘
+            totalMasteredText.offsetHeight;
+        } else {
+            console.error('未找到 total-mastered-text 元素');
         }
     }
 
@@ -815,6 +934,99 @@ class WendyApp {
         }
     }
 
+    // 将 markdown 格式转换为适合小屏幕的结构化 HTML
+    formatMarkdownForSmallScreen(text) {
+        if (!text) return '';
+        
+        let html = text;
+        
+        // 先处理代码块（避免代码块内的内容被其他规则处理）
+        // 移除多行代码块（小屏幕不适合显示）
+        html = html.replace(/```[\s\S]*?```/g, '');
+        
+        // 转义 HTML 特殊字符
+        html = html
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        
+        // 处理行内代码（在转义后处理）
+        html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+        
+        // 按行分割处理
+        const lines = html.split('\n');
+        const result = [];
+        let inList = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            if (!line) {
+                if (inList) {
+                    inList = false;
+                }
+                result.push('<div class="md-paragraph"><br></div>');
+                continue;
+            }
+            
+            // 处理标题
+            if (line.startsWith('### ')) {
+                if (inList) {
+                    inList = false;
+                    result.push('</div>');
+                }
+                result.push(`<div class="md-h3"><strong>${line.substring(4)}</strong></div>`);
+            } else if (line.startsWith('## ')) {
+                if (inList) {
+                    inList = false;
+                    result.push('</div>');
+                }
+                result.push(`<div class="md-h2"><strong>${line.substring(3)}</strong></div>`);
+            } else if (line.startsWith('# ')) {
+                if (inList) {
+                    inList = false;
+                    result.push('</div>');
+                }
+                result.push(`<div class="md-h1"><strong>${line.substring(2)}</strong></div>`);
+            }
+            // 处理列表
+            else if (/^[-*+]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+                if (!inList) {
+                    inList = true;
+                    result.push('<div class="md-list">');
+                }
+                const listContent = line.replace(/^[-*+]\s+/, '').replace(/^\d+\.\s+/, '');
+                result.push(`<div class="md-list-item">• ${listContent}</div>`);
+            }
+            // 处理普通段落
+            else {
+                if (inList) {
+                    inList = false;
+                    result.push('</div>');
+                }
+                // 处理粗体和斜体
+                let processedLine = line
+                    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+                
+                result.push(`<div class="md-paragraph">${processedLine}</div>`);
+            }
+        }
+        
+        // 关闭未关闭的列表
+        if (inList) {
+            result.push('</div>');
+        }
+        
+        html = result.join('');
+        
+        // 清理连续的空白段落
+        html = html.replace(/(<div class="md-paragraph"><br><\/div>\s*)+/g, '<div class="md-paragraph"><br></div>');
+        
+        return html;
+    }
+
     addChatMessage(content, sender, isLoading = false) {
         const chatMessages = document.getElementById('chat-messages');
         const messageDiv = document.createElement('div');
@@ -834,7 +1046,13 @@ class WendyApp {
         
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        messageContent.textContent = content;
+        
+        // 如果是助手消息，格式化 markdown；用户消息保持纯文本
+        if (sender === 'assistant' && !isLoading) {
+            messageContent.innerHTML = this.formatMarkdownForSmallScreen(content);
+        } else {
+            messageContent.textContent = content;
+        }
         
         messageDiv.appendChild(avatar);
         messageDiv.appendChild(messageContent);
