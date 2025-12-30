@@ -21,6 +21,14 @@
 - 🎨 **个性化界面** - 多主题、头像、语言切换
 - 🎤 **语音设置** - 支持中英文语音切换，简短昵称显示（小柔、小星、小莹等）
 - 💬 **鼓励消息** - 随机显示鼓励话语，激励学习
+- 🎮 **单词游戏系统** - 发现页提供多种单词学习游戏
+  - 🎯 **单词挑战** - 根据中文意思选择对应英文单词，支持连击奖励
+  - 📊 **游戏里程碑** - 每个游戏独立的统计数据（游戏次数、答题数、最高得分、最高连击）
+  - 🎨 **游戏卡片** - 9款游戏卡片展示，支持分页浏览
+  - 📁 **模块化架构** - 每个游戏独立的目录结构（HTML+CSS+JS），便于扩展和维护
+- 🖼️ **图片搜索** - 集成Pixabay API，为单词提供记忆图片
+- 🎤 **语音输入** - 集成百度语音API，支持按住说话转文字
+- 📷 **图像识别** - 集成百度OCR API，支持拍照识别文字
 
 ### 技术特性
 - 💾 **SQLite数据库** - 轻量级本地数据存储
@@ -72,8 +80,18 @@ wendy-translator/
 │   │   │                       # - 例句提取
 │   │   ├── deepseek_service.py # DeepSeek AI服务
 │   │   │                       # - AI角色定义（小语）
+│   │   ├── image_service.py # 图片搜索服务
+│   │   │                       # - Pixabay API集成
+│   │   │                       # - 关键词清理
+│   │   ├── speech_service.py # 语音识别服务
+│   │   │                       # - 百度语音API集成
+│   │   │                       # - 音频格式转换
+│   │   ├── ocr_service.py   # 图像识别服务
+│   │   │                       # - 百度OCR API集成
 │   │   ├── configure_api.py # 百度API配置工具
 │   │   ├── configure_youdao_api.py # 有道API配置工具
+│   │   ├── configure_baidu_speech_api.py # 百度语音API配置
+│   │   ├── configure_baidu_ocr_api.py # 百度OCR API配置
 │   │   └── deepseek_config.json # DeepSeek配置文件
 │   ├── utils/               # 工具函数
 │   │   ├── fix_translation.py # 翻译修复工具
@@ -264,6 +282,27 @@ python app.py
 - `GET /api/progress/daily` - 获取每日学习数据
 - `GET /api/encouragement` - 获取随机鼓励消息
 
+### 单词详情
+- `GET /api/word/detail` - 获取单词详细信息（包含词态变化、同义词、反义词、例句、记忆图片等）
+- `POST /api/word/detail` - 保存单词详细信息到数据库
+- `GET /api/word/image` - 搜索单词相关图片（Pixabay API）
+  - 支持 `per_page` 参数控制返回图片数量
+
+### 语音和图像识别
+- `POST /api/speech/recognize` - 语音转文字（百度语音API）
+  - 支持按住说话功能
+  - 自动转换为WAV格式
+- `POST /api/ocr/recognize` - 图像识别文字（百度OCR API）
+  - 支持图片上传识别
+  - 自动填充到输入框
+
+### 游戏系统
+- `GET /api/games/stats` - 获取游戏统计数据
+  - 支持 `game_type` 参数按游戏类型过滤
+  - 返回：总游戏次数、总答题数、最高得分、最高连击
+- `POST /api/games/record` - 保存游戏记录
+  - 保存游戏类型、得分、正确数、总题数、最高连击、正确率等
+
 ### 系统配置
 - `GET /api/config/translation` - 获取翻译API配置
 - `POST /api/config/translation` - 更新翻译API配置
@@ -294,6 +333,30 @@ python app.py
 - `audio_url` - 单词发音音频URL
 - `example_audio_url` - 例句发音音频URL
 - `part_of_speech` - 词性
+
+### 单词详情 (word_details)
+- 单词详细信息存储
+- `english_word` - 英文单词
+- `chinese_meaning` - 中文意思
+- `part_of_speech` - 词性
+- `pronunciation` - 音标
+- `word_forms` - 词态变化（JSON格式）
+- `synonyms` - 同义词（JSON格式，包含word和meaning）
+- `antonyms` - 反义词（JSON格式，包含word和meaning）
+- `more_examples` - 更多例句（JSON格式）
+- `memory_image_url` - 记忆图片URL
+- `memory_image_keyword` - 记忆图片关键词
+
+### 游戏记录 (game_records)
+- 游戏统计数据
+- `user_id` - 用户ID
+- `game_type` - 游戏类型（word-challenge等）
+- `score` - 得分
+- `correct_count` - 答对题数
+- `total_questions` - 总题数
+- `max_combo` - 最高连击
+- `accuracy` - 正确率
+- `created_at` - 创建时间
 
 ## 🎨 界面设计
 
@@ -471,6 +534,19 @@ await wendyApp.handleAddToWordbook();
 - 数据库索引优化查询性能
 
 ## 📈 更新日志
+
+### v1.4.0 (2024-12-30)
+- ✅ **游戏系统重构** - 为每个游戏创建独立目录结构（HTML+CSS+JS），便于扩展和维护
+- ✅ **单词挑战游戏** - 完整的单词挑战游戏实现，支持连击奖励系统
+- ✅ **游戏里程碑功能** - 每个游戏独立的统计数据展示（游戏次数、答题数、最高得分、最高连击）
+- ✅ **游戏记录保存** - 游戏结束后自动保存记录到数据库
+- ✅ **游戏卡片分页** - 超过8个游戏卡片时自动分页显示
+- ✅ **发现页优化** - 游戏卡片图标去重，间距调整优化
+- ✅ **图片搜索功能** - 集成Pixabay API，为单词提供记忆图片
+- ✅ **语音输入功能** - 集成百度语音API，支持按住说话转文字
+- ✅ **图像识别功能** - 集成百度OCR API，支持拍照识别文字
+- ✅ **单词详情卡片** - 显示词态变化、同义词、反义词、更多例句、记忆图片等完整信息
+- ✅ **数据库优化** - 新增word_details和game_records表，支持数据持久化
 
 ### v1.3.0 (2024-12-27)
 - ✅ **金山词霸集成** - 单个英文单词优先使用金山词霸，提供完整词典信息

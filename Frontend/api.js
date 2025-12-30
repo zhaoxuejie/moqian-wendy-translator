@@ -141,8 +141,12 @@ class WendyAPI {
     }
 
     // ====== 游戏服务 ======
-    async getGameStats(username = 'wendy') {
-        return await this.request(`/api/games/stats?username=${encodeURIComponent(username)}`);
+    async getGameStats(username = 'wendy', gameType = null) {
+        let url = `/api/games/stats?username=${encodeURIComponent(username)}`;
+        if (gameType) {
+            url += `&game_type=${encodeURIComponent(gameType)}`;
+        }
+        return await this.request(url);
     }
 
     async saveGameRecord(recordData) {
@@ -179,6 +183,12 @@ class WendyApp {
         this.selectedVoiceName = ''; // 用户选择的语音名称
         this.selectedVoiceLang = ''; // 用户选择的语音语言
         this.availableVoices = []; // 可用的语音列表
+        this.currentGamePage = 1; // 游戏卡片当前页码
+        this.currentGameType = 'word-challenge'; // 当前选中的游戏类型
+        this.wordChallengeGame = null; // 单词挑战游戏实例
+        this.currentGamePage = 1; // 游戏卡片当前页码
+        this.currentGameType = 'word-challenge'; // 当前选中的游戏类型
+        this.wordChallengeGame = null; // 单词挑战游戏实例
         
         // 语音名称到简短昵称的映射表
         this.voiceNicknames = {
@@ -465,8 +475,8 @@ class WendyApp {
             });
         }
         
-        // 加载游戏里程碑数据
-        this.loadGameMilestones();
+        // 加载游戏里程碑数据（默认显示单词挑战）
+        this.loadGameMilestones('word-challenge');
     }
 
     // 处理翻译
@@ -2561,7 +2571,7 @@ class WendyApp {
         
         // 如果是发现页，加载游戏里程碑和渲染游戏卡片
         if (tabName === 'discover') {
-            this.loadGameMilestones();
+            this.loadGameMilestones('word-challenge'); // 默认显示单词挑战的里程碑
             // 延迟渲染，确保DOM已加载
             setTimeout(() => {
                 this.renderGameCards();
@@ -2712,8 +2722,13 @@ class WendyApp {
                     const gameType = card.getAttribute('data-game');
                     if (card.classList.contains('disabled')) {
                         this.showNotification('该游戏即将推出，敬请期待！', 'info');
+                        // 即使游戏未启用，也切换里程碑显示
+                        this.loadGameMilestones(gameType);
                         return;
                     }
+                    
+                    // 切换里程碑显示
+                    this.loadGameMilestones(gameType);
                     
                     if (gameType === 'word-challenge') {
                         this.startWordChallenge();
@@ -2723,9 +2738,10 @@ class WendyApp {
         });
     }
 
-    async loadGameMilestones() {
+    async loadGameMilestones(gameType = 'word-challenge') {
         try {
-            const stats = await this.api.getGameStats('wendy'); // 默认用户名
+            this.currentGameType = gameType; // 更新当前游戏类型
+            const stats = await this.api.getGameStats('wendy', gameType); // 默认用户名，按游戏类型查询
             if (stats.success) {
                 document.getElementById('total-games-played').textContent = stats.total_games || 0;
                 document.getElementById('total-questions-answered').textContent = stats.total_questions || 0;
@@ -2738,282 +2754,19 @@ class WendyApp {
     }
 
     async startWordChallenge() {
-        // 检查单词本是否有单词
-        try {
-            const response = await this.api.getWordbook();
-            const words = response.success ? response.words : [];
-            if (!words || words.length === 0) {
-                this.showNotification('单词本为空，请先添加一些单词', 'warning');
+        // 如果游戏实例不存在，创建它
+        if (!this.wordChallengeGame) {
+            if (typeof WordChallengeGame !== 'undefined') {
+                this.wordChallengeGame = new WordChallengeGame(this.api, this);
+            } else {
+                console.error('WordChallengeGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
                 return;
             }
-            
-            // 打开游戏模态框
-            this.openGameModal();
-            
-            // 初始化单词挑战游戏
-            this.initWordChallengeGame(words);
-        } catch (error) {
-            console.error('启动单词挑战失败:', error);
-            this.showNotification('启动游戏失败，请稍后重试', 'error');
-        }
-    }
-
-    initWordChallengeGame(words) {
-        const container = document.getElementById('game-container');
-        if (!container) return;
-        
-        // 游戏状态
-        const gameState = {
-            words: words,
-            currentQuestionIndex: 0,
-            score: 0,
-            correctCount: 0,
-            totalQuestions: Math.min(10, words.length), // 最多10题
-            currentCombo: 0,
-            maxCombo: 0,
-            questions: []
-        };
-        
-        // 生成题目
-        this.generateWordChallengeQuestions(gameState);
-        
-        // 渲染游戏界面
-        this.renderWordChallengeGame(gameState);
-    }
-
-    generateWordChallengeQuestions(gameState) {
-        const { words, totalQuestions } = gameState;
-        const selectedWords = this.shuffleArray([...words]).slice(0, totalQuestions);
-        
-        gameState.questions = selectedWords.map(word => {
-            // 生成4个选项（1个正确答案 + 3个干扰项）
-            const correctAnswer = word.english_word;
-            const wrongAnswers = this.shuffleArray([...words])
-                .filter(w => w.english_word !== correctAnswer)
-                .slice(0, 3)
-                .map(w => w.english_word);
-            
-            const options = this.shuffleArray([correctAnswer, ...wrongAnswers]);
-            
-            return {
-                word: word,
-                question: word.chinese_meaning,
-                correctAnswer: correctAnswer,
-                options: options,
-                answered: false,
-                isCorrect: false
-            };
-        });
-    }
-
-    renderWordChallengeGame(gameState) {
-        const container = document.getElementById('game-container');
-        if (!container) return;
-        
-        const { currentQuestionIndex, questions, score, currentCombo, totalQuestions } = gameState;
-        
-        if (currentQuestionIndex >= questions.length) {
-            // 游戏结束
-            this.showWordChallengeResult(gameState);
-            return;
         }
         
-        const question = questions[currentQuestionIndex];
-        const progress = ((currentQuestionIndex + 1) / totalQuestions * 100).toFixed(0);
-        
-        container.innerHTML = `
-            <div class="word-challenge-game">
-                <div class="game-header">
-                    <div class="game-title">
-                        <span class="game-title-zh">单词挑战</span>
-                        <span class="game-title-en">Word Challenge</span>
-                    </div>
-                    <div class="game-stats">
-                        <div class="game-stat-item">
-                            <span class="game-stat-label" id="score-label">得分</span>
-                            <span class="game-stat-value">${score}</span>
-                        </div>
-                        <div class="game-stat-item">
-                            <span class="game-stat-label" id="combo-label">连击</span>
-                            <span class="game-stat-value">${currentCombo}</span>
-                        </div>
-                        <div class="game-stat-item">
-                            <span class="game-stat-label" id="progress-label">进度</span>
-                            <span class="game-stat-value">${currentQuestionIndex + 1}/${totalQuestions}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="game-progress-bar">
-                    <div class="game-progress-fill" style="width: ${progress}%"></div>
-                </div>
-                
-                <div class="game-question-area">
-                    <div class="question-number">第 ${currentQuestionIndex + 1} 题</div>
-                    <div class="question-text">${question.question}</div>
-                    <div class="question-hint">请选择对应的英文单词</div>
-                </div>
-                
-                <div class="game-options">
-                    ${question.options.map((option, index) => `
-                        <button class="game-option-btn" data-option="${option}" data-index="${index}">
-                            ${option}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-        
-        // 绑定选项点击事件
-        container.querySelectorAll('.game-option-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const selectedAnswer = e.target.getAttribute('data-option');
-                this.handleWordChallengeAnswer(gameState, selectedAnswer, question);
-            });
-        });
-        
-        // 更新语言显示
-        this.updateGameLanguage();
-    }
-
-    handleWordChallengeAnswer(gameState, selectedAnswer, question) {
-        const isCorrect = selectedAnswer === question.correctAnswer;
-        question.answered = true;
-        question.isCorrect = isCorrect;
-        
-        // 禁用所有按钮
-        const buttons = document.querySelectorAll('.game-option-btn');
-        buttons.forEach(btn => {
-            btn.disabled = true;
-            const option = btn.getAttribute('data-option');
-            if (option === question.correctAnswer) {
-                btn.classList.add('correct');
-            } else if (option === selectedAnswer && !isCorrect) {
-                btn.classList.add('wrong');
-            }
-        });
-        
-        // 更新得分和连击
-        if (isCorrect) {
-            gameState.score += 10;
-            gameState.correctCount++;
-            gameState.currentCombo++;
-            if (gameState.currentCombo > gameState.maxCombo) {
-                gameState.maxCombo = gameState.currentCombo;
-            }
-            
-            // 连击奖励
-            let comboBonus = 0;
-            if (gameState.currentCombo >= 20) comboBonus = 100;
-            else if (gameState.currentCombo >= 10) comboBonus = 50;
-            else if (gameState.currentCombo >= 5) comboBonus = 25;
-            else if (gameState.currentCombo >= 3) comboBonus = 10;
-            
-            if (comboBonus > 0) {
-                gameState.score += comboBonus;
-                this.showComboReward(gameState.currentCombo, comboBonus);
-            }
-        } else {
-            gameState.currentCombo = 0;
-        }
-        
-        // 显示反馈
-        setTimeout(() => {
-            gameState.currentQuestionIndex++;
-            this.renderWordChallengeGame(gameState);
-        }, 1500);
-    }
-
-    showComboReward(combo, bonus) {
-        const container = document.getElementById('game-container');
-        if (!container) return;
-        
-        const comboEl = document.createElement('div');
-        comboEl.className = 'combo-reward';
-        comboEl.innerHTML = `
-            <div class="combo-reward-text">${combo} 连击！</div>
-            <div class="combo-reward-bonus">+${bonus} 分</div>
-        `;
-        container.appendChild(comboEl);
-        
-        setTimeout(() => {
-            comboEl.remove();
-        }, 2000);
-    }
-
-    showWordChallengeResult(gameState) {
-        const container = document.getElementById('game-container');
-        if (!container) return;
-        
-        const { score, correctCount, totalQuestions, maxCombo } = gameState;
-        const accuracy = ((correctCount / totalQuestions) * 100).toFixed(0);
-        
-        container.innerHTML = `
-            <div class="word-challenge-result">
-                <div class="result-title">
-                    <span class="result-title-zh">挑战完成！</span>
-                    <span class="result-title-en">Challenge Complete!</span>
-                </div>
-                
-                <div class="result-stats">
-                    <div class="result-stat-item">
-                        <div class="result-stat-value">${score}</div>
-                        <div class="result-stat-label" id="final-score-label">最终得分</div>
-                    </div>
-                    <div class="result-stat-item">
-                        <div class="result-stat-value">${correctCount}/${totalQuestions}</div>
-                        <div class="result-stat-label" id="correct-count-label">答对题数</div>
-                    </div>
-                    <div class="result-stat-item">
-                        <div class="result-stat-value">${accuracy}%</div>
-                        <div class="result-stat-label" id="accuracy-label">正确率</div>
-                    </div>
-                    <div class="result-stat-item">
-                        <div class="result-stat-value">${maxCombo}</div>
-                        <div class="result-stat-label" id="max-combo-label">最高连击</div>
-                    </div>
-                </div>
-                
-                <div class="result-actions">
-                    <button class="result-btn" id="play-again-btn">再玩一次</button>
-                    <button class="result-btn secondary" id="back-to-discover-btn">返回发现</button>
-                </div>
-            </div>
-        `;
-        
-        // 绑定按钮事件
-        document.getElementById('play-again-btn').addEventListener('click', () => {
-            this.startWordChallenge();
-        });
-        
-        document.getElementById('back-to-discover-btn').addEventListener('click', () => {
-            this.closeGameModal();
-        });
-        
-        // 保存游戏记录
-        this.saveGameRecord('word-challenge', gameState);
-        
-        // 更新里程碑
-        this.loadGameMilestones();
-        
-        // 更新语言显示
-        this.updateGameLanguage();
-    }
-
-    async saveGameRecord(gameType, gameState) {
-        try {
-            await this.api.saveGameRecord({
-                username: 'wendy', // 默认用户名
-                game_type: gameType,
-                score: gameState.score,
-                correct_count: gameState.correctCount,
-                total_questions: gameState.totalQuestions,
-                max_combo: gameState.maxCombo,
-                accuracy: ((gameState.correctCount / gameState.totalQuestions) * 100).toFixed(2)
-            });
-        } catch (error) {
-            console.error('保存游戏记录失败:', error);
-        }
+        // 启动游戏
+        await this.wordChallengeGame.start();
     }
 
     openGameModal() {
@@ -3120,7 +2873,7 @@ class WendyApp {
         
         // 如果是发现页，加载游戏里程碑和渲染游戏卡片
         if (tabName === 'discover') {
-            this.loadGameMilestones();
+            this.loadGameMilestones('word-challenge'); // 默认显示单词挑战的里程碑
             // 延迟渲染，确保DOM已加载
             setTimeout(() => {
                 this.renderGameCards();

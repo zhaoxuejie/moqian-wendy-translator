@@ -1056,11 +1056,13 @@ def get_word_image():
 @app.route('/api/games/stats', methods=['GET'])
 @handle_errors
 def get_game_stats():
-    """获取游戏统计数据"""
+    """获取游戏统计数据，支持按游戏类型过滤"""
     print("🎮 收到游戏统计请求")
     
     try:
         username = request.args.get('username', 'wendy')
+        game_type = request.args.get('game_type', None)  # 可选：按游戏类型过滤
+        
         user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
         
         if not user:
@@ -1068,31 +1070,40 @@ def get_game_stats():
         
         user_id = user['id']
         
+        # 构建查询条件
+        where_clause = 'WHERE user_id = ?'
+        params = [user_id]
+        
+        if game_type:
+            where_clause += ' AND game_type = ?'
+            params.append(game_type)
+            print(f"📊 查询游戏类型: {game_type}")
+        
         # 统计总游戏次数
         total_games = query_db(
-            'SELECT COUNT(*) as count FROM game_records WHERE user_id = ?',
-            (user_id,),
+            f'SELECT COUNT(*) as count FROM game_records {where_clause}',
+            tuple(params),
             one=True
         )
         
         # 统计总答题数
         total_questions = query_db(
-            'SELECT SUM(total_questions) as total FROM game_records WHERE user_id = ?',
-            (user_id,),
+            f'SELECT SUM(total_questions) as total FROM game_records {where_clause}',
+            tuple(params),
             one=True
         )
         
         # 统计最高得分
         highest_score = query_db(
-            'SELECT MAX(score) as max_score FROM game_records WHERE user_id = ?',
-            (user_id,),
+            f'SELECT MAX(score) as max_score FROM game_records {where_clause}',
+            tuple(params),
             one=True
         )
         
         # 统计最高连击
         max_combo = query_db(
-            'SELECT MAX(max_combo) as max_combo FROM game_records WHERE user_id = ?',
-            (user_id,),
+            f'SELECT MAX(max_combo) as max_combo FROM game_records {where_clause}',
+            tuple(params),
             one=True
         )
         
