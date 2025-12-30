@@ -157,6 +157,22 @@ def init_database():
             )
         """)
         
+        # 创建游戏记录表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS game_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                game_type VARCHAR(50) NOT NULL,
+                score INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0,
+                total_questions INTEGER DEFAULT 0,
+                max_combo INTEGER DEFAULT 0,
+                accuracy DECIMAL(5, 2) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        """)
+        
         # 如果表已存在，检查是否需要添加新字段
         cursor.execute("PRAGMA table_info(word_details)")
         columns = [column[1] for column in cursor.fetchall()]
@@ -299,8 +315,37 @@ def ensure_word_details_table():
                 cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
                 conn.commit()
                 print("✅ memory_image_keyword字段添加成功")
-            #print("✅ word_details表已存在")
-            return True
+            print("✅ word_details表已存在")
+        
+        # 检查game_records表是否存在
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='game_records'
+        """)
+        game_records_exists = cursor.fetchone() is not None
+        
+        if not game_records_exists:
+            print("📦 创建game_records表...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS game_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    game_type VARCHAR(50) NOT NULL,
+                    score INTEGER DEFAULT 0,
+                    correct_count INTEGER DEFAULT 0,
+                    total_questions INTEGER DEFAULT 0,
+                    max_combo INTEGER DEFAULT 0,
+                    accuracy DECIMAL(5, 2) DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+            conn.commit()
+            print("✅ game_records表创建成功")
+        else:
+            print("✅ game_records表已存在")
+        
+        return True
     except Exception as e:
         print(f"❌ 创建word_details表失败: {e}")
         import traceback

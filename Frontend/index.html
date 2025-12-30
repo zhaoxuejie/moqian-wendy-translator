@@ -90,7 +90,8 @@
                 <div class="tab active" data-tab="translate"><span id="translate-tab-text">翻译</span></div>
                 <div class="tab" data-tab="chat"><span id="chat-tab-text">对话</span></div>
                 <div class="tab" data-tab="wordbook"><span id="wordbook-tab-text">单词本</span></div>
-                <div class="tab" data-tab="progress"><span id="progress-tab-text">成长记录</span></div>
+                <div class="tab" data-tab="discover"><span id="discover-tab-text">发现</span></div>
+                <div class="tab" data-tab="progress"><span id="progress-tab-text">成长</span></div>
             </div>
             
             <div class="tab-content active" id="translate-tab">
@@ -186,6 +187,114 @@
                 </div>
             </div>
             
+            <div class="tab-content" id="discover-tab">
+                <div class="discover-container">
+                    <div class="game-cards" id="game-cards-container">
+                        <div class="game-card" data-game="word-challenge" id="word-challenge-card">
+                            <div class="game-card-icon">🎯</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Word Challenge</span>
+                                <span class="game-card-title-zh">单词挑战</span>
+                            </div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="time-challenge" id="time-challenge-card">
+                            <div class="game-card-icon">⏱️</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Time Challenge</span>
+                                <span class="game-card-title-zh">限时挑战</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="combo-rewards" id="combo-rewards-card">
+                            <div class="game-card-icon">🔥</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Combo Rewards</span>
+                                <span class="game-card-title-zh">连击奖励</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="ai-battle" id="ai-battle-card">
+                            <div class="game-card-icon">🤖</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">AI Battle</span>
+                                <span class="game-card-title-zh">小语AI对战</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="word-blitz" id="word-blitz-card">
+                            <div class="game-card-icon">⚡</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Word Blitz</span>
+                                <span class="game-card-title-zh">单词速射</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="word-match" id="word-match-card">
+                            <div class="game-card-icon">🧩</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Word Match</span>
+                                <span class="game-card-title-zh">记忆配对</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="adventure" id="adventure-card">
+                            <div class="game-card-icon">🗺️</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Adventure</span>
+                                <span class="game-card-title-zh">单词大冒险</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="word-hunter" id="word-hunter-card">
+                            <div class="game-card-icon">🏹</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">Word Hunter</span>
+                                <span class="game-card-title-zh">单词猎人</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                        
+                        <div class="game-card disabled" data-game="lexipuzzle" id="lexipuzzle-card">
+                            <div class="game-card-icon">🧠</div>
+                            <div class="game-card-title">
+                                <span class="game-card-title-en">LexiPuzzle</span>
+                                <span class="game-card-title-zh">词汇拼图</span>
+                            </div>
+                            <div class="game-card-coming-soon">即将推出</div>
+                        </div>
+                    </div>
+                    
+                    <div class="game-milestone">
+                        <h3 id="game-milestone-title">游戏里程碑</h3>
+                        <div class="milestone-stats">
+                            <div class="milestone-stat-item">
+                                <div class="milestone-stat-value" id="total-games-played">0</div>
+                                <div class="milestone-stat-label" id="total-games-label">总游戏次数</div>
+                            </div>
+                            <div class="milestone-stat-item">
+                                <div class="milestone-stat-value" id="total-questions-answered">0</div>
+                                <div class="milestone-stat-label" id="total-questions-label">总答题数</div>
+                            </div>
+                            <div class="milestone-stat-item">
+                                <div class="milestone-stat-value" id="highest-score">0</div>
+                                <div class="milestone-stat-label" id="highest-score-label">最高得分</div>
+                            </div>
+                            <div class="milestone-stat-item">
+                                <div class="milestone-stat-value" id="max-combo">0</div>
+                                <div class="milestone-stat-label" id="max-combo-label">最高连击</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="tab-content" id="progress-tab">
                 <div class="my-words-section">
                     <h3 id="my-words-title">我的单词</h3>
@@ -235,7 +344,8 @@
                 translateTab: "翻译",
                 chatTab: "对话",
                 wordbookTab: "单词本",
-                progressTab: "成长记录",
+                discoverTab: "发现",
+                progressTab: "成长",
                 translateInput: "在这里输入或说出你想翻译的词语...",
                 translateBtn: "开始翻译",
                 resultTitle: "翻译结果(举例)",
@@ -243,6 +353,18 @@
                 milestoneTitle: "学习里程碑",
                 nextTargetText: "下一个目标：50个单词",
                 progressTitle: "成长记录",
+                discoverTitle: "单词小游戏",
+                discoverSubtitle: "通过游戏轻松记忆单词",
+                wordChallengeDesc: "看中文选英文，测试你的单词记忆",
+                timeChallengeDesc: "限时答题，挑战你的反应速度",
+                comboRewardsDesc: "连续答对获得额外奖励",
+                aiBattleDesc: "与小语AI进行单词对战",
+                gameMilestoneTitle: "游戏里程碑",
+                totalGamesLabel: "总游戏次数",
+                totalQuestionsLabel: "总答题数",
+                highestScoreLabel: "最高得分",
+                maxComboLabel: "最高连击",
+                comingSoon: "即将推出",
                 chatWelcomeText: "你好，温蒂！我是小语，你的英语学习小伙伴，有什么问题都可以问我哦！",
                 encouragementText: "亲爱的温蒂，你进步真棒！爸爸为你感到骄傲！",
                 footerText: "专为温蒂打造 • 充满爱的学习助手",
@@ -264,8 +386,10 @@
                 appSubtitle: "Xiaoyu is here to help!",
                 welcomeText: "Hello Wendy! What interesting words do you want to learn today?",
                 translateTab: "Translate",
+                chatTab: "Chat",
                 wordbookTab: "Wordbook",
-                progressTab: "Progress",
+                discoverTab: "Discover",
+                progressTab: "Growth",
                 translateInput: "Type or speak the word you want to translate...",
                 translateBtn: "Translate",
                 resultTitle: "Translation Result",
@@ -273,6 +397,18 @@
                 milestoneTitle: "Learning Milestone",
                 nextTargetText: "Next goal: 50 words",
                 progressTitle: "Progress Record",
+                discoverTitle: "Word Games",
+                discoverSubtitle: "Learn words through fun games",
+                wordChallengeDesc: "Choose English word from Chinese meaning",
+                timeChallengeDesc: "Answer questions within time limit",
+                comboRewardsDesc: "Get extra rewards for consecutive correct answers",
+                aiBattleDesc: "Battle with Xiaoyu AI in word games",
+                gameMilestoneTitle: "Game Milestones",
+                totalGamesLabel: "Total Games",
+                totalQuestionsLabel: "Total Questions",
+                highestScoreLabel: "Highest Score",
+                maxComboLabel: "Max Combo",
+                comingSoon: "Coming Soon",
                 encouragementText: "Dear Wendy, your progress is amazing! Dad is so proud of you!",
                 footerText: "Made for Wendy • Learning Assistant with Love",
                 congratulationTitle: "Congratulations!",
@@ -303,7 +439,11 @@
             document.getElementById('app-subtitle').textContent = t.appSubtitle;
             document.getElementById('welcome-text').textContent = t.welcomeText;
             document.getElementById('translate-tab-text').textContent = t.translateTab;
+            document.getElementById('chat-tab-text').textContent = t.chatTab;
             document.getElementById('wordbook-tab-text').textContent = t.wordbookTab;
+            if (document.getElementById('discover-tab-text')) {
+                document.getElementById('discover-tab-text').textContent = t.discoverTab;
+            }
             document.getElementById('progress-tab-text').textContent = t.progressTab;
             document.getElementById('translate-input').placeholder = t.translateInput;
             document.getElementById('translate-btn').innerHTML = t.translateBtn + ' <i class="fas fa-magic"></i>';
@@ -336,6 +476,26 @@
                 const englishVoiceTitle = document.getElementById('english-voice-title');
                 if (englishVoiceTitle) englishVoiceTitle.textContent = t.englishVoiceTitle;
             }
+            
+            // 更新发现页文本（标题和副标题已移除，不再需要更新）
+            if (document.getElementById('game-milestone-title')) {
+                document.getElementById('game-milestone-title').textContent = t.gameMilestoneTitle;
+            }
+            if (document.getElementById('total-games-label')) {
+                document.getElementById('total-games-label').textContent = t.totalGamesLabel;
+            }
+            if (document.getElementById('total-questions-label')) {
+                document.getElementById('total-questions-label').textContent = t.totalQuestionsLabel;
+            }
+            if (document.getElementById('highest-score-label')) {
+                document.getElementById('highest-score-label').textContent = t.highestScoreLabel;
+            }
+            if (document.getElementById('max-combo-label')) {
+                document.getElementById('max-combo-label').textContent = t.maxComboLabel;
+            }
+            
+            // 游戏卡片标题始终同时显示英文和中文（不再根据语言切换）
+            // 移除语言切换逻辑，保持英文和中文同时显示
             
             // 调用wendyApp的更新方法（如果已初始化）
             if (typeof wendyApp !== 'undefined' && wendyApp.updateVoiceSettingsText) {
@@ -446,5 +606,13 @@
             console.log('✅ 前端界面初始化完成');
         });
     </script>
+    
+    <!-- 游戏全屏模态框 -->
+    <div id="game-modal" class="game-modal">
+        <div class="game-modal-content">
+            <span class="game-modal-close">&times;</span>
+            <div id="game-container"></div>
+        </div>
+    </div>
 </body>
 </html>

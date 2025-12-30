@@ -140,6 +140,18 @@ class WendyAPI {
         return await response.json();
     }
 
+    // ====== 游戏服务 ======
+    async getGameStats(username = 'wendy') {
+        return await this.request(`/api/games/stats?username=${encodeURIComponent(username)}`);
+    }
+
+    async saveGameRecord(recordData) {
+        return await this.request('/api/games/record', {
+            method: 'POST',
+            body: JSON.stringify(recordData)
+        });
+    }
+
     // ====== 单词详情服务 ======
     async getWordDetail(word) {
         return await this.request(`/api/word/detail?word=${encodeURIComponent(word)}`);
@@ -431,6 +443,30 @@ class WendyApp {
                 this.switchToTab(tabName);
             });
         });
+        
+        // 游戏卡片点击事件
+        this.setupGameCards();
+        
+        // 游戏模态框关闭按钮
+        const gameModalClose = document.querySelector('.game-modal-close');
+        if (gameModalClose) {
+            gameModalClose.addEventListener('click', () => {
+                this.closeGameModal();
+            });
+        }
+        
+        // 点击模态框外部关闭
+        const gameModal = document.getElementById('game-modal');
+        if (gameModal) {
+            gameModal.addEventListener('click', (e) => {
+                if (e.target === gameModal) {
+                    this.closeGameModal();
+                }
+            });
+        }
+        
+        // 加载游戏里程碑数据
+        this.loadGameMilestones();
     }
 
     // 处理翻译
@@ -2517,8 +2553,20 @@ class WendyApp {
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         
         // 激活指定页签
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById(`${tabName}-tab`).classList.add('active');
+        const tabElement = document.querySelector(`[data-tab="${tabName}"]`);
+        const contentElement = document.getElementById(`${tabName}-tab`);
+        
+        if (tabElement) tabElement.classList.add('active');
+        if (contentElement) contentElement.classList.add('active');
+        
+        // 如果是发现页，加载游戏里程碑和渲染游戏卡片
+        if (tabName === 'discover') {
+            this.loadGameMilestones();
+            // 延迟渲染，确保DOM已加载
+            setTimeout(() => {
+                this.renderGameCards();
+            }, 100);
+        }
     }
 
     showNotification(message, type = 'info') {
@@ -2554,6 +2602,529 @@ class WendyApp {
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 3000);
+        }
+    }
+
+    // ====== 游戏功能方法 ======
+    setupGameCards() {
+        // 初始化游戏卡片分页
+        this.currentGamePage = this.currentGamePage || 1;
+        this.renderGameCards();
+    }
+
+    renderGameCards() {
+        const container = document.getElementById('game-cards-container');
+        if (!container) return;
+
+        // 获取所有游戏卡片
+        const allCards = Array.from(container.querySelectorAll('.game-card'));
+        if (allCards.length === 0) return;
+
+        // 分页设置：每页8个卡片
+        const cardsPerPage = 8;
+        const totalPages = Math.ceil(allCards.length / cardsPerPage);
+        
+        // 确保当前页有效
+        if (this.currentGamePage > totalPages) this.currentGamePage = totalPages || 1;
+        
+        // 隐藏所有卡片
+        allCards.forEach(card => {
+            card.style.display = 'none';
+        });
+        
+        // 显示当前页的卡片
+        const startIndex = (this.currentGamePage - 1) * cardsPerPage;
+        const endIndex = startIndex + cardsPerPage;
+        const currentCards = allCards.slice(startIndex, endIndex);
+        
+        currentCards.forEach(card => {
+            card.style.display = 'flex';
+        });
+
+        // 移除旧的分页控件
+        const oldPagination = document.getElementById('game-cards-pagination');
+        if (oldPagination) {
+            oldPagination.remove();
+        }
+
+        // 如果超过8个卡片，添加分页控件
+        if (totalPages > 1) {
+            this.createGameCardsPagination(totalPages);
+        }
+
+        // 重新绑定事件监听器（只对可见的卡片）
+        this.bindGameCardEvents();
+    }
+
+    createGameCardsPagination(totalPages) {
+        const container = document.querySelector('.discover-container');
+        if (!container) return;
+
+        const paginationDiv = document.createElement('div');
+        paginationDiv.id = 'game-cards-pagination';
+        paginationDiv.className = 'pagination';
+        
+        // 上一页按钮
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'pagination-btn';
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        prevBtn.disabled = this.currentGamePage === 1;
+        prevBtn.onclick = () => {
+            this.currentGamePage = Math.max(1, this.currentGamePage - 1);
+            this.renderGameCards();
+        };
+        
+        // 页码
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'page-info';
+        pageInfo.textContent = `${this.currentGamePage} / ${totalPages}`;
+        
+        // 下一页按钮
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'pagination-btn';
+        nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        nextBtn.disabled = this.currentGamePage === totalPages;
+        nextBtn.onclick = () => {
+            this.currentGamePage = Math.min(totalPages, this.currentGamePage + 1);
+            this.renderGameCards();
+        };
+        
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(pageInfo);
+        paginationDiv.appendChild(nextBtn);
+        
+        // 将分页控件插入到 game-cards-container 之后
+        const gameCardsContainer = document.getElementById('game-cards-container');
+        if (gameCardsContainer && gameCardsContainer.nextSibling) {
+            container.insertBefore(paginationDiv, gameCardsContainer.nextSibling);
+        } else {
+            container.appendChild(paginationDiv);
+        }
+    }
+
+    bindGameCardEvents() {
+        const gameCards = document.querySelectorAll('.game-card');
+        gameCards.forEach(card => {
+            // 只对可见的卡片绑定事件（避免重复绑定）
+            if (card.style.display !== 'none' && !card.hasAttribute('data-event-bound')) {
+                card.setAttribute('data-event-bound', 'true');
+                card.addEventListener('click', () => {
+                    const gameType = card.getAttribute('data-game');
+                    if (card.classList.contains('disabled')) {
+                        this.showNotification('该游戏即将推出，敬请期待！', 'info');
+                        return;
+                    }
+                    
+                    if (gameType === 'word-challenge') {
+                        this.startWordChallenge();
+                    }
+                });
+            }
+        });
+    }
+
+    async loadGameMilestones() {
+        try {
+            const stats = await this.api.getGameStats('wendy'); // 默认用户名
+            if (stats.success) {
+                document.getElementById('total-games-played').textContent = stats.total_games || 0;
+                document.getElementById('total-questions-answered').textContent = stats.total_questions || 0;
+                document.getElementById('highest-score').textContent = stats.highest_score || 0;
+                document.getElementById('max-combo').textContent = stats.max_combo || 0;
+            }
+        } catch (error) {
+            console.error('加载游戏里程碑失败:', error);
+        }
+    }
+
+    async startWordChallenge() {
+        // 检查单词本是否有单词
+        try {
+            const response = await this.api.getWordbook();
+            const words = response.success ? response.words : [];
+            if (!words || words.length === 0) {
+                this.showNotification('单词本为空，请先添加一些单词', 'warning');
+                return;
+            }
+            
+            // 打开游戏模态框
+            this.openGameModal();
+            
+            // 初始化单词挑战游戏
+            this.initWordChallengeGame(words);
+        } catch (error) {
+            console.error('启动单词挑战失败:', error);
+            this.showNotification('启动游戏失败，请稍后重试', 'error');
+        }
+    }
+
+    initWordChallengeGame(words) {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        
+        // 游戏状态
+        const gameState = {
+            words: words,
+            currentQuestionIndex: 0,
+            score: 0,
+            correctCount: 0,
+            totalQuestions: Math.min(10, words.length), // 最多10题
+            currentCombo: 0,
+            maxCombo: 0,
+            questions: []
+        };
+        
+        // 生成题目
+        this.generateWordChallengeQuestions(gameState);
+        
+        // 渲染游戏界面
+        this.renderWordChallengeGame(gameState);
+    }
+
+    generateWordChallengeQuestions(gameState) {
+        const { words, totalQuestions } = gameState;
+        const selectedWords = this.shuffleArray([...words]).slice(0, totalQuestions);
+        
+        gameState.questions = selectedWords.map(word => {
+            // 生成4个选项（1个正确答案 + 3个干扰项）
+            const correctAnswer = word.english_word;
+            const wrongAnswers = this.shuffleArray([...words])
+                .filter(w => w.english_word !== correctAnswer)
+                .slice(0, 3)
+                .map(w => w.english_word);
+            
+            const options = this.shuffleArray([correctAnswer, ...wrongAnswers]);
+            
+            return {
+                word: word,
+                question: word.chinese_meaning,
+                correctAnswer: correctAnswer,
+                options: options,
+                answered: false,
+                isCorrect: false
+            };
+        });
+    }
+
+    renderWordChallengeGame(gameState) {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        
+        const { currentQuestionIndex, questions, score, currentCombo, totalQuestions } = gameState;
+        
+        if (currentQuestionIndex >= questions.length) {
+            // 游戏结束
+            this.showWordChallengeResult(gameState);
+            return;
+        }
+        
+        const question = questions[currentQuestionIndex];
+        const progress = ((currentQuestionIndex + 1) / totalQuestions * 100).toFixed(0);
+        
+        container.innerHTML = `
+            <div class="word-challenge-game">
+                <div class="game-header">
+                    <div class="game-title">
+                        <span class="game-title-zh">单词挑战</span>
+                        <span class="game-title-en">Word Challenge</span>
+                    </div>
+                    <div class="game-stats">
+                        <div class="game-stat-item">
+                            <span class="game-stat-label" id="score-label">得分</span>
+                            <span class="game-stat-value">${score}</span>
+                        </div>
+                        <div class="game-stat-item">
+                            <span class="game-stat-label" id="combo-label">连击</span>
+                            <span class="game-stat-value">${currentCombo}</span>
+                        </div>
+                        <div class="game-stat-item">
+                            <span class="game-stat-label" id="progress-label">进度</span>
+                            <span class="game-stat-value">${currentQuestionIndex + 1}/${totalQuestions}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="game-progress-bar">
+                    <div class="game-progress-fill" style="width: ${progress}%"></div>
+                </div>
+                
+                <div class="game-question-area">
+                    <div class="question-number">第 ${currentQuestionIndex + 1} 题</div>
+                    <div class="question-text">${question.question}</div>
+                    <div class="question-hint">请选择对应的英文单词</div>
+                </div>
+                
+                <div class="game-options">
+                    ${question.options.map((option, index) => `
+                        <button class="game-option-btn" data-option="${option}" data-index="${index}">
+                            ${option}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        
+        // 绑定选项点击事件
+        container.querySelectorAll('.game-option-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const selectedAnswer = e.target.getAttribute('data-option');
+                this.handleWordChallengeAnswer(gameState, selectedAnswer, question);
+            });
+        });
+        
+        // 更新语言显示
+        this.updateGameLanguage();
+    }
+
+    handleWordChallengeAnswer(gameState, selectedAnswer, question) {
+        const isCorrect = selectedAnswer === question.correctAnswer;
+        question.answered = true;
+        question.isCorrect = isCorrect;
+        
+        // 禁用所有按钮
+        const buttons = document.querySelectorAll('.game-option-btn');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            const option = btn.getAttribute('data-option');
+            if (option === question.correctAnswer) {
+                btn.classList.add('correct');
+            } else if (option === selectedAnswer && !isCorrect) {
+                btn.classList.add('wrong');
+            }
+        });
+        
+        // 更新得分和连击
+        if (isCorrect) {
+            gameState.score += 10;
+            gameState.correctCount++;
+            gameState.currentCombo++;
+            if (gameState.currentCombo > gameState.maxCombo) {
+                gameState.maxCombo = gameState.currentCombo;
+            }
+            
+            // 连击奖励
+            let comboBonus = 0;
+            if (gameState.currentCombo >= 20) comboBonus = 100;
+            else if (gameState.currentCombo >= 10) comboBonus = 50;
+            else if (gameState.currentCombo >= 5) comboBonus = 25;
+            else if (gameState.currentCombo >= 3) comboBonus = 10;
+            
+            if (comboBonus > 0) {
+                gameState.score += comboBonus;
+                this.showComboReward(gameState.currentCombo, comboBonus);
+            }
+        } else {
+            gameState.currentCombo = 0;
+        }
+        
+        // 显示反馈
+        setTimeout(() => {
+            gameState.currentQuestionIndex++;
+            this.renderWordChallengeGame(gameState);
+        }, 1500);
+    }
+
+    showComboReward(combo, bonus) {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        
+        const comboEl = document.createElement('div');
+        comboEl.className = 'combo-reward';
+        comboEl.innerHTML = `
+            <div class="combo-reward-text">${combo} 连击！</div>
+            <div class="combo-reward-bonus">+${bonus} 分</div>
+        `;
+        container.appendChild(comboEl);
+        
+        setTimeout(() => {
+            comboEl.remove();
+        }, 2000);
+    }
+
+    showWordChallengeResult(gameState) {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        
+        const { score, correctCount, totalQuestions, maxCombo } = gameState;
+        const accuracy = ((correctCount / totalQuestions) * 100).toFixed(0);
+        
+        container.innerHTML = `
+            <div class="word-challenge-result">
+                <div class="result-title">
+                    <span class="result-title-zh">挑战完成！</span>
+                    <span class="result-title-en">Challenge Complete!</span>
+                </div>
+                
+                <div class="result-stats">
+                    <div class="result-stat-item">
+                        <div class="result-stat-value">${score}</div>
+                        <div class="result-stat-label" id="final-score-label">最终得分</div>
+                    </div>
+                    <div class="result-stat-item">
+                        <div class="result-stat-value">${correctCount}/${totalQuestions}</div>
+                        <div class="result-stat-label" id="correct-count-label">答对题数</div>
+                    </div>
+                    <div class="result-stat-item">
+                        <div class="result-stat-value">${accuracy}%</div>
+                        <div class="result-stat-label" id="accuracy-label">正确率</div>
+                    </div>
+                    <div class="result-stat-item">
+                        <div class="result-stat-value">${maxCombo}</div>
+                        <div class="result-stat-label" id="max-combo-label">最高连击</div>
+                    </div>
+                </div>
+                
+                <div class="result-actions">
+                    <button class="result-btn" id="play-again-btn">再玩一次</button>
+                    <button class="result-btn secondary" id="back-to-discover-btn">返回发现</button>
+                </div>
+            </div>
+        `;
+        
+        // 绑定按钮事件
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            this.startWordChallenge();
+        });
+        
+        document.getElementById('back-to-discover-btn').addEventListener('click', () => {
+            this.closeGameModal();
+        });
+        
+        // 保存游戏记录
+        this.saveGameRecord('word-challenge', gameState);
+        
+        // 更新里程碑
+        this.loadGameMilestones();
+        
+        // 更新语言显示
+        this.updateGameLanguage();
+    }
+
+    async saveGameRecord(gameType, gameState) {
+        try {
+            await this.api.saveGameRecord({
+                username: 'wendy', // 默认用户名
+                game_type: gameType,
+                score: gameState.score,
+                correct_count: gameState.correctCount,
+                total_questions: gameState.totalQuestions,
+                max_combo: gameState.maxCombo,
+                accuracy: ((gameState.correctCount / gameState.totalQuestions) * 100).toFixed(2)
+            });
+        } catch (error) {
+            console.error('保存游戏记录失败:', error);
+        }
+    }
+
+    openGameModal() {
+        const modal = document.getElementById('game-modal');
+        if (modal) {
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden'; // 禁止背景滚动
+        }
+    }
+
+    closeGameModal() {
+        const modal = document.getElementById('game-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            document.body.style.overflow = ''; // 恢复滚动
+        }
+    }
+
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    updateGameLanguage() {
+        const lang = this.currentLanguage;
+        const gameTitleZh = document.querySelector('.game-title-zh');
+        const gameTitleEn = document.querySelector('.game-title-en');
+        const resultTitleZh = document.querySelector('.result-title-zh');
+        const resultTitleEn = document.querySelector('.result-title-en');
+        
+        if (gameTitleZh && gameTitleEn) {
+            gameTitleZh.style.display = lang === 'zh' ? 'block' : 'none';
+            gameTitleEn.style.display = lang === 'zh' ? 'none' : 'block';
+        }
+        
+        if (resultTitleZh && resultTitleEn) {
+            resultTitleZh.style.display = lang === 'zh' ? 'block' : 'none';
+            resultTitleEn.style.display = lang === 'zh' ? 'none' : 'block';
+        }
+        
+        // 更新其他游戏文本
+        const translations = {
+            zh: {
+                scoreLabel: '得分',
+                comboLabel: '连击',
+                progressLabel: '进度',
+                finalScoreLabel: '最终得分',
+                correctCountLabel: '答对题数',
+                accuracyLabel: '正确率',
+                maxComboLabel: '最高连击',
+                playAgainBtn: '再玩一次',
+                backToDiscoverBtn: '返回发现'
+            },
+            en: {
+                scoreLabel: 'Score',
+                comboLabel: 'Combo',
+                progressLabel: 'Progress',
+                finalScoreLabel: 'Final Score',
+                correctCountLabel: 'Correct',
+                accuracyLabel: 'Accuracy',
+                maxComboLabel: 'Max Combo',
+                playAgainBtn: 'Play Again',
+                backToDiscoverBtn: 'Back to Discover'
+            }
+        };
+        
+        const t = translations[lang];
+        const scoreLabel = document.getElementById('score-label');
+        const comboLabel = document.getElementById('combo-label');
+        const progressLabel = document.getElementById('progress-label');
+        const finalScoreLabel = document.getElementById('final-score-label');
+        const correctCountLabel = document.getElementById('correct-count-label');
+        const accuracyLabel = document.getElementById('accuracy-label');
+        const maxComboLabel = document.getElementById('max-combo-label');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const backToDiscoverBtn = document.getElementById('back-to-discover-btn');
+        
+        if (scoreLabel && t.scoreLabel) scoreLabel.textContent = t.scoreLabel;
+        if (comboLabel && t.comboLabel) comboLabel.textContent = t.comboLabel;
+        if (progressLabel && t.progressLabel) progressLabel.textContent = t.progressLabel;
+        if (finalScoreLabel && t.finalScoreLabel) finalScoreLabel.textContent = t.finalScoreLabel;
+        if (correctCountLabel && t.correctCountLabel) correctCountLabel.textContent = t.correctCountLabel;
+        if (accuracyLabel && t.accuracyLabel) accuracyLabel.textContent = t.accuracyLabel;
+        if (maxComboLabel && t.maxComboLabel) maxComboLabel.textContent = t.maxComboLabel;
+        if (playAgainBtn && t.playAgainBtn) playAgainBtn.textContent = t.playAgainBtn;
+        if (backToDiscoverBtn && t.backToDiscoverBtn) backToDiscoverBtn.textContent = t.backToDiscoverBtn;
+    }
+
+    switchToTab(tabName) {
+        // 移除所有活跃状态
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // 激活指定页签
+        const tabElement = document.querySelector(`[data-tab="${tabName}"]`);
+        const contentElement = document.getElementById(`${tabName}-tab`);
+        
+        if (tabElement) tabElement.classList.add('active');
+        if (contentElement) contentElement.classList.add('active');
+        
+        // 如果是发现页，加载游戏里程碑和渲染游戏卡片
+        if (tabName === 'discover') {
+            this.loadGameMilestones();
+            // 延迟渲染，确保DOM已加载
+            setTimeout(() => {
+                this.renderGameCards();
+            }, 100);
         }
     }
 

@@ -1052,6 +1052,115 @@ def get_word_image():
             'error': f'服务异常: {str(e)}'
         }), 500
 
+# ====== 游戏 API ======
+@app.route('/api/games/stats', methods=['GET'])
+@handle_errors
+def get_game_stats():
+    """获取游戏统计数据"""
+    print("🎮 收到游戏统计请求")
+    
+    try:
+        username = request.args.get('username', 'wendy')
+        user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+        
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        
+        user_id = user['id']
+        
+        # 统计总游戏次数
+        total_games = query_db(
+            'SELECT COUNT(*) as count FROM game_records WHERE user_id = ?',
+            (user_id,),
+            one=True
+        )
+        
+        # 统计总答题数
+        total_questions = query_db(
+            'SELECT SUM(total_questions) as total FROM game_records WHERE user_id = ?',
+            (user_id,),
+            one=True
+        )
+        
+        # 统计最高得分
+        highest_score = query_db(
+            'SELECT MAX(score) as max_score FROM game_records WHERE user_id = ?',
+            (user_id,),
+            one=True
+        )
+        
+        # 统计最高连击
+        max_combo = query_db(
+            'SELECT MAX(max_combo) as max_combo FROM game_records WHERE user_id = ?',
+            (user_id,),
+            one=True
+        )
+        
+        return jsonify({
+            'success': True,
+            'total_games': total_games['count'] if total_games else 0,
+            'total_questions': total_questions['total'] if total_questions and total_questions['total'] else 0,
+            'highest_score': highest_score['max_score'] if highest_score and highest_score['max_score'] else 0,
+            'max_combo': max_combo['max_combo'] if max_combo and max_combo['max_combo'] else 0
+        })
+        
+    except Exception as e:
+        print(f"💥 游戏统计API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}'
+        }), 500
+
+@app.route('/api/games/record', methods=['POST'])
+@handle_errors
+def save_game_record():
+    """保存游戏记录"""
+    print("🎮 收到游戏记录保存请求")
+    
+    try:
+        data = request.get_json()
+        username = data.get('username', 'wendy')
+        game_type = data.get('game_type', '')
+        score = data.get('score', 0)
+        correct_count = data.get('correct_count', 0)
+        total_questions = data.get('total_questions', 0)
+        max_combo = data.get('max_combo', 0)
+        accuracy = data.get('accuracy', 0)
+        
+        if not game_type:
+            return jsonify({'success': False, 'error': '游戏类型不能为空'}), 400
+        
+        user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        
+        user_id = user['id']
+        
+        # 保存游戏记录
+        execute_db('''
+            INSERT INTO game_records 
+            (user_id, game_type, score, correct_count, total_questions, max_combo, accuracy)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, game_type, score, correct_count, total_questions, max_combo, accuracy))
+        
+        print(f"✅ 游戏记录已保存: {game_type}, 得分: {score}")
+        
+        return jsonify({
+            'success': True,
+            'message': '游戏记录已保存'
+        })
+        
+    except Exception as e:
+        print(f"💥 保存游戏记录API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}'
+        }), 500
+
 # 启动服务器
 if __name__ == '__main__':
     print("🚀 温蒂翻译助手后端服务启动")
