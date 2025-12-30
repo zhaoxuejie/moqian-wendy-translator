@@ -180,6 +180,37 @@ body {
     transform: scale(1.05);
 }
 
+.option-btn.recording {
+    background-color: #ff4444 !important;
+    color: white !important;
+    border-color: #ff4444 !important;
+    animation: recording-pulse 1s infinite;
+}
+
+.option-btn.recording i {
+    animation: recording-icon-pulse 0.5s infinite;
+}
+
+@keyframes recording-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+    }
+}
+
+@keyframes recording-icon-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
 .translate-btn {
     display: block;
     width: 100%;

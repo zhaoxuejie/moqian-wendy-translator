@@ -365,13 +365,8 @@ class WendyApp {
             this.initVoices();
         }
 
-        // 语音输入
-        const voiceInputBtn = document.querySelector('[data-input="voice"]');
-        if (voiceInputBtn) {
-            voiceInputBtn.addEventListener('click', () => {
-                this.simulateVoiceInput();
-            });
-        }
+        // 语音输入（按住说话）
+        this.setupVoiceInputButtons();
 
         // 对话按钮
         const chatBtn = document.getElementById('chat-btn');
@@ -1203,18 +1198,247 @@ class WendyApp {
         }
     }
 
-    // 模拟语音输入
-    simulateVoiceInput() {
-        const textarea = document.getElementById('translate-input');
-        const sampleTexts = [
-            'Hello, how are you?',
-            'I like apples',
-            'The weather is nice today',
-            'What is your name?'
-        ];
-        const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
-        textarea.value = randomText;
-        this.showNotification('语音输入已识别', 'info');
+    setupVoiceInputButtons() {
+        // 为所有语音输入按钮设置按住说话功能
+        const voiceInputBtns = document.querySelectorAll('[data-input="voice"]');
+        
+        voiceInputBtns.forEach(btn => {
+            // 找到对应的输入框（翻译或对话）
+            const container = btn.closest('.input-area');
+            let inputElement = null;
+            if (container) {
+                const textarea = container.querySelector('textarea');
+                if (textarea) {
+                    inputElement = textarea;
+                }
+            }
+            
+            if (!inputElement) return;
+            
+            // 按住开始录音
+            const startRecording = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.startVoiceRecognition(inputElement.id);
+                btn.classList.add('recording');
+            };
+            
+            // 松开结束录音
+            const stopRecording = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.stopVoiceRecognition();
+                btn.classList.remove('recording');
+            };
+            
+            // 鼠标事件
+            btn.addEventListener('mousedown', startRecording);
+            btn.addEventListener('mouseup', stopRecording);
+            btn.addEventListener('mouseleave', stopRecording); // 鼠标移出也停止
+            
+            // 触摸事件（移动端）
+            btn.addEventListener('touchstart', startRecording, { passive: false });
+            btn.addEventListener('touchend', stopRecording, { passive: false });
+            btn.addEventListener('touchcancel', stopRecording, { passive: false });
+        });
+    }
+
+    async startVoiceRecognition(inputElementId = 'translate-input') {
+        const textarea = document.getElementById(inputElementId);
+        if (!textarea) return;
+        
+        // 检查浏览器支持
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.showNotification('您的浏览器不支持录音功能，请使用现代浏览器', 'warning');
+            return;
+        }
+        
+        try {
+            // 请求麦克风权限
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    channelCount: 1,  // 单声道
+                    sampleRate: 16000, // 16kHz采样率（百度API推荐）
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
+            
+            // 创建MediaRecorder
+            const options = {
+                mimeType: 'audio/webm;codecs=opus'  // 使用webm格式
+            };
+            
+            // 如果浏览器不支持webm，尝试其他格式
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    options.mimeType = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options.mimeType = 'audio/mp4';
+                } else {
+                    options.mimeType = ''; // 使用默认格式
+                }
+            }
+            
+            const mediaRecorder = new MediaRecorder(stream, options);
+            const audioChunks = [];
+            
+            // 开始录音
+            mediaRecorder.start();
+            this.showNotification('正在录音...', 'info');
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = async () => {
+                // 停止所有音频轨道
+                stream.getTracks().forEach(track => track.stop());
+                
+                if (audioChunks.length === 0) {
+                    this.showNotification('录音失败，请重试', 'error');
+                    return;
+                }
+                
+                // 合并音频数据
+                const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                
+                // 转换为WAV格式（百度API需要）
+                try {
+                    const wavBlob = await this.convertToWav(audioBlob);
+                    
+                    // 发送到后端识别
+                    const formData = new FormData();
+                    formData.append('audio', wavBlob, 'recording.wav');
+                    formData.append('language', 'en'); // 识别英语
+                    formData.append('format', 'wav');
+                    formData.append('rate', '16000');
+                    
+                    this.showNotification('正在识别...', 'info');
+                    
+                    const response = await fetch('/api/speech/recognize', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        textarea.value = result.text;
+                        this.showNotification('语音识别成功', 'success');
+                    } else {
+                        this.showNotification(result.error || '识别失败', 'error');
+                    }
+                } catch (error) {
+                    console.error('音频转换或识别失败:', error);
+                    this.showNotification('识别失败，请重试', 'error');
+                }
+            };
+            
+            // 保存 mediaRecorder 以便停止
+            this.currentMediaRecorder = mediaRecorder;
+            this.currentStream = stream;
+            
+        } catch (error) {
+            console.error('启动录音失败:', error);
+            let errorMsg = '无法访问麦克风';
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                errorMsg = '请允许使用麦克风权限';
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                errorMsg = '未找到麦克风设备';
+            }
+            this.showNotification(errorMsg, 'error');
+            
+            // 清理按钮状态
+            const voiceInputBtns = document.querySelectorAll('[data-input="voice"]');
+            voiceInputBtns.forEach(btn => btn.classList.remove('recording'));
+        }
+    }
+
+    stopVoiceRecognition() {
+        if (this.currentMediaRecorder && this.currentMediaRecorder.state !== 'inactive') {
+            this.currentMediaRecorder.stop();
+        }
+        if (this.currentStream) {
+            this.currentStream.getTracks().forEach(track => track.stop());
+            this.currentStream = null;
+        }
+        this.currentMediaRecorder = null;
+    }
+
+    async convertToWav(audioBlob) {
+        // 使用Web Audio API转换为WAV格式
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // 转换为16kHz单声道
+        const sampleRate = 16000;
+        const numberOfChannels = 1;
+        const length = audioBuffer.length * sampleRate / audioBuffer.sampleRate;
+        const newAudioBuffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
+        
+        // 重采样
+        const sourceData = audioBuffer.getChannelData(0);
+        const targetData = newAudioBuffer.getChannelData(0);
+        const ratio = audioBuffer.sampleRate / sampleRate;
+        
+        for (let i = 0; i < length; i++) {
+            const index = Math.floor(i * ratio);
+            targetData[i] = sourceData[index];
+        }
+        
+        // 转换为WAV格式
+        const wav = this.audioBufferToWav(newAudioBuffer);
+        return new Blob([wav], { type: 'audio/wav' });
+    }
+
+    audioBufferToWav(buffer) {
+        const length = buffer.length;
+        const numberOfChannels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const bytesPerSample = 2;
+        const blockAlign = numberOfChannels * bytesPerSample;
+        const byteRate = sampleRate * blockAlign;
+        const dataSize = length * blockAlign;
+        const bufferSize = 44 + dataSize;
+        
+        const arrayBuffer = new ArrayBuffer(bufferSize);
+        const view = new DataView(arrayBuffer);
+        
+        // WAV文件头
+        const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+        
+        writeString(0, 'RIFF');
+        view.setUint32(4, bufferSize - 8, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true); // fmt chunk size
+        view.setUint16(20, 1, true); // audio format (PCM)
+        view.setUint16(22, numberOfChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, byteRate, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bytesPerSample * 8, true);
+        writeString(36, 'data');
+        view.setUint32(40, dataSize, true);
+        
+        // 写入PCM数据
+        let offset = 44;
+        const channelData = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) {
+            const sample = Math.max(-1, Math.min(1, channelData[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
+        }
+        
+        return arrayBuffer;
     }
 
     // 模拟相机输入

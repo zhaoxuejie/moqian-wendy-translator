@@ -44,6 +44,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.translation_service import translation_service
 from services.image_service import image_service
+from services.speech_service import speech_service
 from core.config import translation_config
 
 app = Flask(__name__, static_folder='../../frontend', static_url_path='')
@@ -101,6 +102,19 @@ except Exception as e:
     except Exception as e2:
         print(f"⚠️  百度翻译API配置失败: {e2}")
         print("ℹ️  将使用模拟翻译服务")
+
+# 配置百度语音识别API
+try:
+    from services.configure_baidu_speech_api import BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY
+    if BAIDU_SPEECH_API_KEY and BAIDU_SPEECH_SECRET_KEY:
+        speech_service.set_config(BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY)
+        print("✅ 百度语音识别API已配置")
+    else:
+        print("ℹ️  百度语音识别API未配置（可在configure_baidu_speech_api.py中配置）")
+except ImportError:
+    print("ℹ️  百度语音识别API配置文件未找到")
+except Exception as e:
+    print(f"⚠️  百度语音识别API配置失败: {e}")
 
 # 数据库连接
 def get_db():
@@ -727,6 +741,62 @@ def chat_with_ai():
             'error': f'服务异常: {str(e)}',
             'response': '抱歉，对话服务出现异常，请稍后再试。'
         })
+
+# ====== 语音识别 API ======
+@app.route('/api/speech/recognize', methods=['POST'])
+@handle_errors
+def recognize_speech():
+    """语音识别接口"""
+    print("🎤 收到语音识别请求")
+    
+    try:
+        # 检查是否有音频文件
+        if 'audio' not in request.files:
+            return jsonify({'success': False, 'error': '未找到音频文件'}), 400
+        
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({'success': False, 'error': '音频文件为空'}), 400
+        
+        # 获取参数
+        language = request.form.get('language', 'en')  # 默认英文
+        format_type = request.form.get('format', 'wav')  # 默认wav
+        rate = int(request.form.get('rate', 16000))  # 默认16kHz
+        
+        # 读取音频数据
+        audio_data = audio_file.read()
+        
+        print(f"📋 请求参数:")
+        print(f"   - 语言: {language}")
+        print(f"   - 格式: {format_type}")
+        print(f"   - 采样率: {rate}")
+        print(f"   - 音频大小: {len(audio_data)} 字节")
+        
+        # 调用语音识别服务
+        result = speech_service.recognize_audio(
+            audio_data=audio_data,
+            format=format_type,
+            rate=rate,
+            language=language
+        )
+        
+        print(f"📝 语音识别服务返回:")
+        print(f"   - 成功: {result.get('success')}")
+        if result.get('success'):
+            print(f"   - 识别文本: {result.get('text', '')}")
+        else:
+            print(f"   - 错误: {result.get('error')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"💥 语音识别API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}'
+        }), 500
 
 # ====== 单词详情 API ======
 @app.route('/api/word/detail', methods=['GET'])
