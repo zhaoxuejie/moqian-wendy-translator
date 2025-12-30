@@ -120,6 +120,23 @@ class WendyAPI {
     async getEncouragement() {
         return await this.request('/api/encouragement');
     }
+
+    // ====== 图片服务 ======
+    async getWordImage(keyword, lang = 'zh') {
+        return await this.request(`/api/word/image?keyword=${encodeURIComponent(keyword)}&lang=${lang}`);
+    }
+
+    // ====== 单词详情服务 ======
+    async getWordDetail(word) {
+        return await this.request(`/api/word/detail?word=${encodeURIComponent(word)}`);
+    }
+
+    async saveWordDetail(detailData) {
+        return await this.request('/api/word/detail', {
+            method: 'POST',
+            body: JSON.stringify(detailData)
+        });
+    }
 }
 
 // 创建全局API实例
@@ -368,6 +385,14 @@ class WendyApp {
             deepseekChatBtn.addEventListener('click', () => this.handleDeepSeekChat());
         }
 
+        // 苹果图标点击事件 - 显示单词图片
+        const wordImageBtn = document.querySelector('.word-image');
+        if (wordImageBtn) {
+            wordImageBtn.style.cursor = 'pointer';
+            wordImageBtn.setAttribute('title', '查看单词图片');
+            wordImageBtn.addEventListener('click', () => this.handleWordImage());
+        }
+
         // 相机输入
         const cameraInputBtn = document.querySelector('[data-input="camera"]');
         if (cameraInputBtn) {
@@ -412,7 +437,11 @@ class WendyApp {
                 const resultSection = document.getElementById('translation-result');
                 resultSection.classList.add('active');
                 
-                this.showNotification('翻译完成！', 'success');
+                // 更新标题，去掉"(举例)"
+                const resultTitle = document.getElementById('result-title');
+                if (resultTitle && resultTitle.textContent.includes('(举例)')) {
+                    resultTitle.textContent = '翻译结果';
+                }
             }
         } catch (error) {
             this.showNotification('翻译失败: ' + error.message, 'error');
@@ -1401,6 +1430,469 @@ class WendyApp {
             this.addChatMessage(question, 'user');
             this.handleChatWithMessage(question);
         }, 500);
+    }
+
+    // ====== 图片功能 ======
+    async handleWordImage() {
+        // 获取当前翻译的单词
+        let originalText = document.querySelector('.original-text')?.textContent?.trim();
+        let translatedText = document.querySelector('.translated-text')?.textContent?.trim();
+        
+        if (!originalText) {
+            this.showNotification('请先翻译一个单词', 'warning');
+            return;
+        }
+
+        // 清理关键词：移除特殊字符前缀（如 [翻译]、[英] 等）
+        originalText = originalText.replace(/^\[.*?\]\s*/, '').trim();
+        translatedText = translatedText ? translatedText.replace(/^\[.*?\]\s*/, '').trim() : '';
+        
+        // 显示加载状态
+        const wordImageBtn = document.querySelector('.word-image');
+        if (wordImageBtn) {
+            const originalHTML = wordImageBtn.innerHTML;
+            wordImageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            wordImageBtn.style.pointerEvents = 'none';
+            
+            try {
+                // 直接显示详情卡片，不再获取单词图片
+                await this.showWordImage();
+            } catch (error) {
+                console.error('显示单词详情失败:', error);
+                this.showNotification('显示单词详情失败，请稍后重试', 'error');
+            } finally {
+                // 恢复按钮状态
+                wordImageBtn.innerHTML = originalHTML;
+                wordImageBtn.style.pointerEvents = 'auto';
+            }
+        }
+    }
+
+    async showWordImage() {
+        // 获取当前翻译的详细信息
+        const originalText = document.querySelector('.original-text')?.textContent?.trim().replace(/^\[.*?\]\s*/, '').toLowerCase();
+        const translatedText = document.querySelector('.translated-text')?.textContent?.trim();
+        const partOfSpeech = document.querySelector('.part-of-speech')?.textContent?.trim() || '';
+        const pronunciation = document.querySelector('.phonetic-text')?.textContent?.trim() || '';
+        
+        // 获取例句（需要清理可能的HTML标签）
+        let currentExample = '';
+        let currentExampleZh = '';
+        const exampleEnEl = document.querySelector('.example-sentence .example-en');
+        if (exampleEnEl) {
+            const clone = exampleEnEl.cloneNode(true);
+            const speakerBtn = clone.querySelector('.example-speaker-btn');
+            if (speakerBtn) speakerBtn.remove();
+            currentExample = clone.textContent?.trim() || '';
+        }
+        const exampleZhEl = document.querySelector('.example-sentence .example-zh');
+        if (exampleZhEl) {
+            currentExampleZh = exampleZhEl.textContent?.trim() || '';
+        }
+
+        // 先从数据库获取单词详情
+        let wordDetails = null;
+        let fromCache = false;
+        let cachedMemoryImageUrl = null;
+        let memoryImageKeyword = ''; // 提前声明，避免覆盖
+        try {
+            const cachedDetail = await this.api.getWordDetail(originalText);
+            if (cachedDetail.success) {
+                wordDetails = cachedDetail;
+                cachedMemoryImageUrl = cachedDetail.memory_image_url;
+                memoryImageKeyword = cachedDetail.memory_image_keyword || '';
+                fromCache = true;
+                console.log('✅ 从数据库加载单词详情', {
+                    word: cachedDetail.word,
+                    hasMemoryKeyword: !!memoryImageKeyword,
+                    hasMemoryUrl: !!cachedMemoryImageUrl
+                });
+                
+                // 如果数据库中的同义词/反义词是字符串数组，转换为对象数组
+                if (Array.isArray(wordDetails.synonyms) && wordDetails.synonyms.length > 0) {
+                    if (typeof wordDetails.synonyms[0] === 'string') {
+                        wordDetails.synonyms = wordDetails.synonyms.map(syn => ({ word: syn, meaning: '' }));
+                    }
+                }
+                if (Array.isArray(wordDetails.antonyms) && wordDetails.antonyms.length > 0) {
+                    if (typeof wordDetails.antonyms[0] === 'string') {
+                        wordDetails.antonyms = wordDetails.antonyms.map(ant => ({ word: ant, meaning: '' }));
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('数据库中没有该单词详情，将获取新数据', error);
+        }
+
+        // 如果没有缓存，获取新数据
+        if (!wordDetails || !fromCache) {
+            try {
+                const aiDetails = await this.getWordDetails(originalText);
+                wordDetails = {
+                    word_forms: aiDetails?.word_forms || [],
+                    synonyms: aiDetails?.synonyms || [],
+                    antonyms: aiDetails?.antonyms || [],
+                    more_examples: aiDetails?.more_examples || []
+                };
+                // 保存记忆图片关键词
+                memoryImageKeyword = aiDetails?.memory_image_keyword || '';
+            } catch (error) {
+                console.error('获取单词详情失败:', error);
+                wordDetails = {
+                    word_forms: [],
+                    synonyms: [],
+                    antonyms: [],
+                    more_examples: []
+                };
+            }
+        }
+
+        // 构建详情卡片内容
+        // 优先使用数据库中的数据，如果数据库没有则使用DOM中的数据
+        const finalPartOfSpeech = fromCache && wordDetails?.part_of_speech ? wordDetails.part_of_speech : partOfSpeech;
+        const finalPronunciation = fromCache && wordDetails?.pronunciation ? wordDetails.pronunciation : pronunciation;
+        const finalTranslatedText = fromCache && wordDetails?.chinese_meaning ? wordDetails.chinese_meaning : translatedText;
+        
+        const wordForms = wordDetails?.word_forms || [];
+        
+        // 处理同义词和反义词（支持字符串数组和对象数组）
+        let synonyms = [];
+        if (wordDetails?.synonyms) {
+            if (Array.isArray(wordDetails.synonyms)) {
+                synonyms = wordDetails.synonyms.map(syn => {
+                    if (typeof syn === 'string') {
+                        return { word: syn, meaning: '' };
+                    }
+                    return { word: syn.word || syn, meaning: syn.meaning || '' };
+                });
+            } else if (typeof wordDetails.synonyms === 'string') {
+                synonyms = [{ word: wordDetails.synonyms, meaning: '' }];
+            }
+        }
+        
+        let antonyms = [];
+        if (wordDetails?.antonyms) {
+            if (Array.isArray(wordDetails.antonyms)) {
+                antonyms = wordDetails.antonyms.map(ant => {
+                    if (typeof ant === 'string') {
+                        return { word: ant, meaning: '' };
+                    }
+                    return { word: ant.word || ant, meaning: ant.meaning || '' };
+                });
+            } else if (typeof wordDetails.antonyms === 'string') {
+                antonyms = [{ word: wordDetails.antonyms, meaning: '' }];
+            }
+        }
+        
+        const moreExamples = wordDetails?.more_examples || [];
+
+        // 如果有当前例句，添加到更多例句中（如果还没有）
+        if (currentExample && !moreExamples.some(e => e.en === currentExample)) {
+            moreExamples.unshift({
+                en: currentExample,
+                zh: currentExampleZh
+            });
+        }
+        // 限制最多3个例句
+        const examplesToShow = moreExamples.slice(0, 3);
+
+        // 创建或获取详情卡片容器
+        let detailModal = document.getElementById('word-detail-modal');
+        if (!detailModal) {
+            detailModal = document.createElement('div');
+            detailModal.id = 'word-detail-modal';
+            detailModal.className = 'word-detail-modal';
+            document.body.appendChild(detailModal);
+            
+            detailModal.addEventListener('click', (e) => {
+                if (e.target === detailModal) {
+                    detailModal.classList.remove('show');
+                }
+            });
+        }
+
+        // 构建HTML（记忆图片占位符，异步加载）
+        detailModal.innerHTML = `
+            <div class="word-detail-content">
+                <span class="word-detail-close">&times;</span>
+                
+                <!-- 单词基本信息 -->
+                <div class="word-detail-header">
+                    <h2 class="word-detail-word">${originalText}</h2>
+                    ${finalPronunciation ? `<div class="word-detail-pronunciation">${finalPronunciation}</div>` : ''}
+                    ${finalPartOfSpeech ? `<div class="word-detail-pos">${finalPartOfSpeech}</div>` : ''}
+                    <div class="word-detail-meaning">${finalTranslatedText}</div>
+                </div>
+                
+                <!-- 词态变化（包含记忆图片） -->
+                <div class="word-detail-section">
+                    <h3 class="word-detail-section-title">词态变化</h3>
+                    ${wordForms.length > 0 ? `
+                    <div class="word-detail-forms">
+                        ${wordForms.map(form => `
+                            <div class="word-form-item">
+                                <span class="word-form-label">${form.label}:</span>
+                                <span class="word-form-value">${form.value}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ` : ''}
+                    <!-- 记忆图片 -->
+                    <div class="memory-image-container" id="memory-image-container">
+                        <div class="memory-image-loading">正在生成记忆图片...</div>
+                    </div>
+                </div>
+                
+                <!-- 同义词（带释义） -->
+                ${synonyms.length > 0 ? `
+                <div class="word-detail-section">
+                    <h3 class="word-detail-section-title">同义词</h3>
+                    <div class="word-detail-synonyms">
+                        ${synonyms.map(syn => {
+                            const word = typeof syn === 'string' ? syn : (syn.word || syn);
+                            const meaning = typeof syn === 'object' && syn.meaning ? syn.meaning : '';
+                            return `<div class="synonym-item">
+                                <span class="synonym-tag">${word}</span>
+                                ${meaning ? `<span class="synonym-meaning">${meaning}</span>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- 反义词（带释义） -->
+                ${antonyms.length > 0 ? `
+                <div class="word-detail-section">
+                    <h3 class="word-detail-section-title">反义词</h3>
+                    <div class="word-detail-antonyms">
+                        ${antonyms.map(ant => {
+                            const word = typeof ant === 'string' ? ant : (ant.word || ant);
+                            const meaning = typeof ant === 'object' && ant.meaning ? ant.meaning : '';
+                            return `<div class="antonym-item">
+                                <span class="antonym-tag">${word}</span>
+                                ${meaning ? `<span class="antonym-meaning">${meaning}</span>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- 更多例句（带播放按钮） -->
+                ${examplesToShow.length > 0 ? `
+                <div class="word-detail-section">
+                    <h3 class="word-detail-section-title">更多例句</h3>
+                    <div class="word-detail-examples">
+                        ${examplesToShow.map((ex, idx) => `
+                            <div class="word-example-item">
+                                <div class="word-example-en">
+                                    ${idx + 1}. ${ex.en}
+                                    <div class="word-example-speaker" data-text="${(ex.en || '').replace(/"/g, '&quot;')}" title="朗读">
+                                        <i class="fas fa-volume-up"></i>
+                                    </div>
+                                </div>
+                                ${ex.zh ? `<div class="word-example-zh">${ex.zh}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        // 关闭按钮事件
+        detailModal.querySelector('.word-detail-close').addEventListener('click', () => {
+            detailModal.classList.remove('show');
+        });
+
+        // 绑定例句播放按钮
+        detailModal.querySelectorAll('.word-example-speaker').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const text = btn.getAttribute('data-text');
+                if (text) {
+                    this.speakText(text);
+                }
+            });
+        });
+
+        // 直接显示详情卡片
+        detailModal.classList.add('show');
+
+        // 异步加载记忆图片（传入记忆图片关键词，避免重复调用AI）
+        this.loadMemoryImage(originalText, cachedMemoryImageUrl || wordDetails?.memory_image_url, memoryImageKeyword);
+
+        // 保存到数据库（异步，不阻塞显示）- 只有从AI获取新数据时才保存
+        if (!fromCache) {
+            this.saveWordDetailToDB(originalText, {
+                chinese_meaning: finalTranslatedText,
+                part_of_speech: finalPartOfSpeech,
+                pronunciation: finalPronunciation,
+                memory_image_keyword: memoryImageKeyword,
+                word_forms: wordForms,
+                synonyms: synonyms,
+                antonyms: antonyms,
+                more_examples: examplesToShow
+            });
+        }
+    }
+
+    async loadMemoryImage(word, existingUrl = null, memoryImageKeyword = '') {
+        const container = document.getElementById('memory-image-container');
+        if (!container) return;
+
+        // 如果已有URL，直接显示
+        if (existingUrl) {
+            container.innerHTML = `<img src="${existingUrl}" alt="记忆图片" class="memory-image" onerror="this.parentElement.innerHTML='<div class=\\'memory-image-error\\'>图片加载失败</div>'">`;
+            return;
+        }
+
+        // 如果有记忆图片关键词（从getWordDetails获取），直接使用
+        if (memoryImageKeyword) {
+            try {
+                // 获取记忆图片
+                const imageResult = await this.api.getWordImage(memoryImageKeyword, 'en');
+                if (imageResult.success && imageResult.image_url) {
+                    container.innerHTML = `<img src="${imageResult.image_url}" alt="记忆图片" class="memory-image" onerror="this.parentElement.innerHTML='<div class=\\'memory-image-error\\'>图片加载失败</div>'">`;
+                    
+                    // 保存记忆图片URL到数据库
+                    await this.saveMemoryImageUrl(word, imageResult.image_url);
+                } else {
+                    container.innerHTML = '<div class="memory-image-error">记忆图片生成失败</div>';
+                }
+            } catch (error) {
+                console.error('获取记忆图片失败:', error);
+                container.innerHTML = '<div class="memory-image-error">记忆图片生成失败</div>';
+            }
+            return;
+        }
+
+        // 如果没有关键词（理论上不会到这里，因为getWordDetails已经包含了），作为备用方案
+        // 这种情况不应该发生，但保留作为容错
+        container.innerHTML = '<div class="memory-image-error">记忆图片关键词缺失</div>';
+    }
+
+    async saveMemoryImageUrl(word, imageUrl) {
+        try {
+            // 获取现有详情
+            const detail = await this.api.getWordDetail(word);
+            if (detail.success) {
+                // 更新记忆图片URL
+                await this.api.saveWordDetail({
+                    word: word,
+                    chinese_meaning: detail.chinese_meaning || '',
+                    part_of_speech: detail.part_of_speech || '',
+                    pronunciation: detail.pronunciation || '',
+                    word_image_url: detail.word_image_url || '',
+                    memory_image_url: imageUrl,
+                    memory_image_keyword: detail.memory_image_keyword || '',
+                    word_forms: detail.word_forms || [],
+                    synonyms: detail.synonyms || [],
+                    antonyms: detail.antonyms || [],
+                    more_examples: detail.more_examples || []
+                });
+            } else {
+                // 如果不存在，创建新记录
+                await this.api.saveWordDetail({
+                    word: word,
+                    memory_image_url: imageUrl
+                });
+            }
+        } catch (error) {
+            console.error('保存记忆图片URL失败:', error);
+        }
+    }
+
+    async saveWordDetailToDB(word, detailData) {
+        try {
+            // 确保同义词和反义词格式正确，保存完整的对象数组（包含word和meaning）
+            const synonyms = detailData.synonyms || [];
+            const antonyms = detailData.antonyms || [];
+            
+            // 确保同义词/反义词是对象数组格式（包含word和meaning）
+            const synonymsForDB = synonyms.map(syn => {
+                if (typeof syn === 'object' && syn.word) {
+                    return { word: syn.word, meaning: syn.meaning || '' };
+                }
+                return { word: typeof syn === 'string' ? syn : '', meaning: '' };
+            }).filter(s => s.word);
+            
+            const antonymsForDB = antonyms.map(ant => {
+                if (typeof ant === 'object' && ant.word) {
+                    return { word: ant.word, meaning: ant.meaning || '' };
+                }
+                return { word: typeof ant === 'string' ? ant : '', meaning: '' };
+            }).filter(a => a.word);
+            
+            await this.api.saveWordDetail({
+                word: word,
+                ...detailData,
+                synonyms: synonymsForDB,
+                antonyms: antonymsForDB
+            });
+            console.log('✅ 单词详情已保存到数据库');
+        } catch (error) {
+            console.error('保存单词详情失败:', error);
+        }
+    }
+
+    async getWordDetails(word) {
+        // 使用AI获取单词详细信息（包含记忆图片关键词）
+        try {
+            const prompt = `请为单词"${word}"提供以下信息，用JSON格式返回：
+1. 词态变化（word_forms）：过去式、过去分词、现在分词、第三人称单数、比较级、最高级等（如果有）
+2. 同义词（synonyms）：3-5个常用同义词，每个包含word（单词）和meaning（中文释义）
+3. 反义词（antonyms）：1-3个常用反义词，每个包含word（单词）和meaning（中文释义）
+4. 更多例句（more_examples）：3个例句，每个包含英文（en）和中文翻译（zh）
+5. 记忆图片关键词（memory_image_keyword）：一个简短的英文关键词，卡通的更好，用于搜索能帮助小学生记忆这个单词的图片
+
+请严格按照以下JSON格式返回，不要添加任何其他文字说明：
+{
+  "word_forms": [{"label": "过去式", "value": "xxx"}, {"label": "过去分词", "value": "xxx"}],
+  "synonyms": [{"word": "同义词1", "meaning": "中文释义1"}, {"word": "同义词2", "meaning": "中文释义2"}],
+  "antonyms": [{"word": "反义词1", "meaning": "中文释义1"}, {"word": "反义词2", "meaning": "中文释义2"}],
+  "more_examples": [{"en": "英文例句1", "zh": "中文翻译1"}, {"en": "英文例句2", "zh": "中文翻译2"}, {"en": "英文例句3", "zh": "中文翻译3"}],
+  "memory_image_keyword": "记忆图片搜索关键词"
+}`;
+
+            const response = await this.api.chatWithAI(prompt);
+            if (response.success && response.response) {
+                // 尝试从AI回复中提取JSON
+                let jsonText = response.response;
+                
+                // 移除可能的markdown代码块标记
+                jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+                
+                // 查找JSON对象
+                const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        const details = JSON.parse(jsonMatch[0]);
+                        // 验证数据结构
+                        if (details && typeof details === 'object') {
+                            return {
+                                word_forms: Array.isArray(details.word_forms) ? details.word_forms : [],
+                                synonyms: Array.isArray(details.synonyms) ? details.synonyms : [],
+                                antonyms: Array.isArray(details.antonyms) ? details.antonyms : [],
+                                more_examples: Array.isArray(details.more_examples) ? details.more_examples : [],
+                                memory_image_keyword: details.memory_image_keyword || ''
+                            };
+                        }
+                    } catch (parseError) {
+                        console.error('JSON解析失败:', parseError);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('获取单词详情失败:', error);
+        }
+        // 返回空结构，确保前端不会报错
+        return {
+            word_forms: [],
+            synonyms: [],
+            antonyms: [],
+            more_examples: [],
+            memory_image_keyword: ''
+        };
     }
 
     async handleChatWithMessage(message) {

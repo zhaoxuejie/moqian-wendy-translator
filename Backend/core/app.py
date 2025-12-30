@@ -43,6 +43,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.translation_service import translation_service
+from services.image_service import image_service
 from core.config import translation_config
 
 app = Flask(__name__, static_folder='../../frontend', static_url_path='')
@@ -727,6 +728,167 @@ def chat_with_ai():
             'response': '抱歉，对话服务出现异常，请稍后再试。'
         })
 
+# ====== 单词详情 API ======
+@app.route('/api/word/detail', methods=['GET'])
+@handle_errors
+def get_word_detail():
+    """获取单词详情（从数据库）"""
+    try:
+        word = request.args.get('word', '').strip().lower()
+        if not word:
+            return jsonify({'success': False, 'error': '单词不能为空'}), 400
+        
+        # 从数据库查询
+        detail = query_db(
+            'SELECT * FROM word_details WHERE english_word = ?',
+            (word,),
+            one=True
+        )
+        
+        if detail:
+            import json
+            # 将 sqlite3.Row 转换为字典，以便使用 .get() 方法
+            detail_dict = dict(detail)
+            return jsonify({
+                'success': True,
+                'word': detail_dict['english_word'],
+                'chinese_meaning': detail_dict.get('chinese_meaning', ''),
+                'part_of_speech': detail_dict.get('part_of_speech', ''),
+                'pronunciation': detail_dict.get('pronunciation', ''),
+                'word_image_url': detail_dict.get('word_image_url', ''),
+                'memory_image_url': detail_dict.get('memory_image_url', ''),
+                'memory_image_keyword': detail_dict.get('memory_image_keyword', ''),
+                'word_forms': json.loads(detail_dict['word_forms']) if detail_dict.get('word_forms') else [],
+                'synonyms': json.loads(detail_dict['synonyms']) if detail_dict.get('synonyms') else [],
+                'antonyms': json.loads(detail_dict['antonyms']) if detail_dict.get('antonyms') else [],
+                'more_examples': json.loads(detail_dict['more_examples']) if detail_dict.get('more_examples') else [],
+                'from_cache': True
+            })
+        else:
+            return jsonify({'success': False, 'error': '未找到单词详情'}), 404
+            
+    except Exception as e:
+        print(f"💥 获取单词详情异常: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/word/detail', methods=['POST'])
+@handle_errors
+def save_word_detail():
+    """保存单词详情到数据库"""
+    try:
+        data = request.get_json()
+        word = data.get('word', '').strip().lower()
+        
+        if not word:
+            return jsonify({'success': False, 'error': '单词不能为空'}), 400
+        
+        import json
+        
+        # 检查是否已存在
+        existing = query_db(
+            'SELECT id FROM word_details WHERE english_word = ?',
+            (word,),
+            one=True
+        )
+        
+        if existing:
+            # 更新
+            execute_db('''
+                UPDATE word_details SET
+                    chinese_meaning = ?,
+                    part_of_speech = ?,
+                    pronunciation = ?,
+                    word_image_url = ?,
+                    memory_image_url = ?,
+                    memory_image_keyword = ?,
+                    word_forms = ?,
+                    synonyms = ?,
+                    antonyms = ?,
+                    more_examples = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE english_word = ?
+            ''', (
+                data.get('chinese_meaning', ''),
+                data.get('part_of_speech', ''),
+                data.get('pronunciation', ''),
+                data.get('word_image_url', ''),
+                data.get('memory_image_url', ''),
+                data.get('memory_image_keyword', ''),
+                json.dumps(data.get('word_forms', []), ensure_ascii=False),
+                json.dumps(data.get('synonyms', []), ensure_ascii=False),
+                json.dumps(data.get('antonyms', []), ensure_ascii=False),
+                json.dumps(data.get('more_examples', []), ensure_ascii=False),
+                word
+            ))
+        else:
+            # 插入
+            execute_db('''
+                INSERT INTO word_details 
+                (english_word, chinese_meaning, part_of_speech, pronunciation, 
+                 word_image_url, memory_image_url, memory_image_keyword, word_forms, synonyms, antonyms, more_examples)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                word,
+                data.get('chinese_meaning', ''),
+                data.get('part_of_speech', ''),
+                data.get('pronunciation', ''),
+                data.get('word_image_url', ''),
+                data.get('memory_image_url', ''),
+                data.get('memory_image_keyword', ''),
+                json.dumps(data.get('word_forms', []), ensure_ascii=False),
+                json.dumps(data.get('synonyms', []), ensure_ascii=False),
+                json.dumps(data.get('antonyms', []), ensure_ascii=False),
+                json.dumps(data.get('more_examples', []), ensure_ascii=False)
+            ))
+        
+        return jsonify({'success': True, 'message': '单词详情已保存'})
+        
+    except Exception as e:
+        print(f"💥 保存单词详情异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ====== 图片服务 API ======
+@app.route('/api/word/image', methods=['GET'])
+@handle_errors
+def get_word_image():
+    """获取单词相关图片"""
+    print("🖼️  收到图片请求")
+    
+    try:
+        keyword = request.args.get('keyword', '').strip()
+        lang = request.args.get('lang', 'zh')  # 默认中文搜索
+        
+        if not keyword:
+            return jsonify({'success': False, 'error': '关键词不能为空'}), 400
+        
+        print(f"📋 请求参数:")
+        print(f"   - 关键词: {keyword}")
+        print(f"   - 语言: {lang}")
+        
+        # 调用图片服务
+        result = image_service.search_image(keyword, lang=lang, per_page=3)
+        
+        print(f"📝 图片服务返回:")
+        print(f"   - 成功: {result.get('success')}")
+        if result.get('success'):
+            print(f"   - 找到图片数: {result.get('total', 0)}")
+            print(f"   - 图片URL: {result.get('image_url', '')[:50]}...")
+        else:
+            print(f"   - 错误: {result.get('error')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"💥 图片API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}'
+        }), 500
+
 # 启动服务器
 if __name__ == '__main__':
     print("🚀 温蒂翻译助手后端服务启动")
@@ -736,6 +898,40 @@ if __name__ == '__main__':
     if not os.path.exists(DATABASE):
         print("❌ 数据库不存在，请先运行 python database_init.py")
         exit(1)
+    
+    # 确保word_details表存在
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='word_details'
+        """)
+        if not cursor.fetchone():
+            print("📦 检测到word_details表不存在，正在创建...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS word_details (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    english_word VARCHAR(100) NOT NULL UNIQUE,
+                    chinese_meaning VARCHAR(200),
+                    part_of_speech VARCHAR(50),
+                    pronunciation VARCHAR(100),
+                    word_image_url VARCHAR(500),
+                    memory_image_url VARCHAR(500),
+                    word_forms TEXT,
+                    synonyms TEXT,
+                    antonyms TEXT,
+                    more_examples TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            print("✅ word_details表创建成功")
+        conn.close()
+    except Exception as e:
+        print(f"⚠️  检查word_details表时出错: {e}")
+        print("   建议运行 python Backend/database/database_init.py 来初始化数据库")
     
     print(f"📁 工作目录: {os.getcwd()}")
     print(f"💾 数据库: {DATABASE}")

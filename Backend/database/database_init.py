@@ -7,7 +7,14 @@
 
 import sqlite3
 import os
+import sys
 from datetime import datetime
+
+# 设置标准输出编码为UTF-8（解决Windows下emoji显示问题）
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 def init_database():
     """初始化数据库"""
@@ -130,6 +137,32 @@ def init_database():
             )
         """)
         
+        # 创建单词详情表（存储单词详细信息）
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS word_details (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                english_word VARCHAR(100) NOT NULL UNIQUE,
+                chinese_meaning VARCHAR(200),
+                part_of_speech VARCHAR(50),
+                pronunciation VARCHAR(100),
+                word_image_url VARCHAR(500),
+                memory_image_url VARCHAR(500),
+                memory_image_keyword VARCHAR(200),
+                word_forms TEXT,
+                synonyms TEXT,
+                antonyms TEXT,
+                more_examples TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 如果表已存在，检查是否需要添加新字段
+        cursor.execute("PRAGMA table_info(word_details)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'memory_image_keyword' not in columns:
+            cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
+        
         # 插入默认用户（温蒂）
         cursor.execute("""
             INSERT OR IGNORE INTO users (username, display_name, avatar, theme, language, volume)
@@ -210,6 +243,69 @@ def check_database():
         
     except Exception as e:
         print(f"❌ 数据库检查失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    finally:
+        conn.close()
+
+def ensure_word_details_table():
+    """确保word_details表存在（用于已存在的数据库）"""
+    db_path = os.path.join(os.path.dirname(__file__), 'wendy_translator.db')
+    
+    if not os.path.exists(db_path):
+        return False
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # 检查word_details表是否存在
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='word_details'
+        """)
+        table_exists = cursor.fetchone() is not None
+        
+        if not table_exists:
+            print("📦 创建word_details表...")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS word_details (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    english_word VARCHAR(100) NOT NULL UNIQUE,
+                    chinese_meaning VARCHAR(200),
+                    part_of_speech VARCHAR(50),
+                    pronunciation VARCHAR(100),
+                    word_image_url VARCHAR(500),
+                    memory_image_url VARCHAR(500),
+                    memory_image_keyword VARCHAR(200),
+                    word_forms TEXT,
+                    synonyms TEXT,
+                    antonyms TEXT,
+                    more_examples TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            print("✅ word_details表创建成功")
+            return True
+        else:
+            # 检查是否需要添加memory_image_keyword字段
+            cursor.execute("PRAGMA table_info(word_details)")
+            columns = [column[1] for column in cursor.fetchall()]
+            if 'memory_image_keyword' not in columns:
+                print("📦 添加memory_image_keyword字段...")
+                cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
+                conn.commit()
+                print("✅ memory_image_keyword字段添加成功")
+            print("✅ word_details表已存在")
+            return True
+    except Exception as e:
+        print(f"❌ 创建word_details表失败: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -226,6 +322,8 @@ if __name__ == "__main__":
     else:
         print("🔍 检查数据库状态...")
         check_database()
+        # 确保word_details表存在
+        ensure_word_details_table()
     
     print("=" * 40)
     print("✨ 数据库操作完成！")
