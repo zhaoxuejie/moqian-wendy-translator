@@ -299,7 +299,7 @@ def ensure_word_details_table():
                 cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
                 conn.commit()
                 print("✅ memory_image_keyword字段添加成功")
-            print("✅ word_details表已存在")
+            #print("✅ word_details表已存在")
             return True
     except Exception as e:
         print(f"❌ 创建word_details表失败: {e}")

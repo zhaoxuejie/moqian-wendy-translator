@@ -126,6 +126,20 @@ class WendyAPI {
         return await this.request(`/api/word/image?keyword=${encodeURIComponent(keyword)}&lang=${lang}&per_page=${perPage}`);
     }
 
+    async recognizeOCR(imageFile, language = 'ENG', accurate = false) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('language', language);
+        formData.append('accurate', accurate.toString());
+        
+        const response = await fetch('/api/ocr/recognize', {
+            method: 'POST',
+            body: formData
+        });
+        
+        return await response.json();
+    }
+
     // ====== 单词详情服务 ======
     async getWordDetail(word) {
         return await this.request(`/api/word/detail?word=${encodeURIComponent(word)}`);
@@ -388,13 +402,26 @@ class WendyApp {
             wordImageBtn.addEventListener('click', () => this.handleWordImage());
         }
 
-        // 相机输入
-        const cameraInputBtn = document.querySelector('[data-input="camera"]');
-        if (cameraInputBtn) {
-            cameraInputBtn.addEventListener('click', () => {
-                this.simulateCameraInput();
+        // 相机输入（OCR图片识别）- 为所有相机按钮绑定事件
+        const cameraInputBtns = document.querySelectorAll('[data-input="camera"]');
+        cameraInputBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 找到对应的输入框
+                const container = btn.closest('.input-area');
+                let inputElement = null;
+                if (container) {
+                    const textarea = container.querySelector('textarea');
+                    if (textarea) {
+                        inputElement = textarea;
+                    }
+                }
+                // 如果没找到，尝试根据ID查找
+                if (!inputElement) {
+                    inputElement = document.getElementById('translate-input') || document.getElementById('chat-input');
+                }
+                this.startOCRRecognition(inputElement ? inputElement.id : null);
             });
-        }
+        });
 
         // 页签切换
         document.querySelectorAll('.tab').forEach(tab => {
@@ -1441,13 +1468,110 @@ class WendyApp {
         return arrayBuffer;
     }
 
-    // 模拟相机输入
-    simulateCameraInput() {
-        const textarea = document.getElementById('translate-input');
-        const sampleWords = ['apple', 'cat', 'sun', 'book', 'flower'];
-        const randomWord = sampleWords[Math.floor(Math.random() * sampleWords.length)];
-        textarea.value = randomWord;
-        this.showNotification('图片文字已识别', 'info');
+    startOCRRecognition(inputElementId = null) {
+        // 创建隐藏的文件输入框
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        
+        // 添加change事件监听
+        input.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                // 用户取消了选择，清理input元素
+                if (input.parentNode) {
+                    input.parentNode.removeChild(input);
+                }
+                return;
+            }
+            
+            // 检查文件类型
+            if (!file.type.startsWith('image/')) {
+                this.showNotification('请选择图片文件', 'warning');
+                if (input.parentNode) {
+                    input.parentNode.removeChild(input);
+                }
+                return;
+            }
+            
+            // 检查文件大小（限制10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                this.showNotification('图片文件过大，请选择小于10MB的图片', 'warning');
+                if (input.parentNode) {
+                    input.parentNode.removeChild(input);
+                }
+                return;
+            }
+            
+            // 找到对应的输入框
+            let textarea = null;
+            
+            // 如果指定了输入框ID，直接使用
+            if (inputElementId) {
+                textarea = document.getElementById(inputElementId);
+            }
+            
+            // 如果没找到，尝试从当前活动的输入区域查找
+            if (!textarea) {
+                const activeTab = document.querySelector('.tab-content.active');
+                if (activeTab) {
+                    textarea = activeTab.querySelector('textarea');
+                }
+            }
+            
+            // 如果还是没找到，尝试根据ID查找
+            if (!textarea) {
+                textarea = document.getElementById('translate-input') || document.getElementById('chat-input');
+            }
+            
+            if (!textarea) {
+                this.showNotification('未找到输入框', 'error');
+                if (input.parentNode) {
+                    input.parentNode.removeChild(input);
+                }
+                return;
+            }
+            
+            // 显示识别中提示
+            this.showNotification('正在识别图片文字...', 'info');
+            
+            try {
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('image', file);
+                formData.append('language', 'ENG'); // 识别英文
+                formData.append('accurate', 'false'); // 使用标准版（免费额度更多）
+                
+                // 发送到后端识别
+                const response = await fetch('/api/ocr/recognize', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 识别成功，填入输入框
+                    textarea.value = result.text;
+                    this.showNotification('图片文字识别成功', 'success');
+                } else {
+                    this.showNotification(result.error || '识别失败', 'error');
+                }
+            } catch (error) {
+                console.error('OCR识别失败:', error);
+                this.showNotification('识别请求失败，请稍后重试', 'error');
+            } finally {
+                // 清理input元素
+                if (input.parentNode) {
+                    input.parentNode.removeChild(input);
+                }
+            }
+        });
+        
+        // 添加到页面并触发点击
+        document.body.appendChild(input);
+        input.click();
     }
     
     // 获取语音的简短昵称

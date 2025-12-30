@@ -45,6 +45,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.translation_service import translation_service
 from services.image_service import image_service
 from services.speech_service import speech_service
+from services.ocr_service import ocr_service
 from core.config import translation_config
 
 app = Flask(__name__, static_folder='../../frontend', static_url_path='')
@@ -115,6 +116,36 @@ except ImportError:
     print("ℹ️  百度语音识别API配置文件未找到")
 except Exception as e:
     print(f"⚠️  百度语音识别API配置失败: {e}")
+
+# 配置百度OCR API
+try:
+    from services.configure_baidu_ocr_api import BAIDU_OCR_API_KEY, BAIDU_OCR_SECRET_KEY
+    if BAIDU_OCR_API_KEY and BAIDU_OCR_SECRET_KEY:
+        ocr_service.set_config(BAIDU_OCR_API_KEY, BAIDU_OCR_SECRET_KEY)
+        print("✅ 百度OCR API已配置")
+    else:
+        # 如果OCR未配置，尝试使用语音识别的API Key（可以共用）
+        try:
+            from services.configure_baidu_speech_api import BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY
+            if BAIDU_SPEECH_API_KEY and BAIDU_SPEECH_SECRET_KEY:
+                ocr_service.set_config(BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY)
+                print("✅ 百度OCR API已配置（使用语音识别的API Key）")
+            else:
+                print("ℹ️  百度OCR API未配置（可在configure_baidu_ocr_api.py中配置）")
+        except:
+            print("ℹ️  百度OCR API未配置（可在configure_baidu_ocr_api.py中配置）")
+except ImportError:
+    print("ℹ️  百度OCR API配置文件未找到")
+    # 尝试使用语音识别的API Key
+    try:
+        from services.configure_baidu_speech_api import BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY
+        if BAIDU_SPEECH_API_KEY and BAIDU_SPEECH_SECRET_KEY:
+            ocr_service.set_config(BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY)
+            print("✅ 百度OCR API已配置（使用语音识别的API Key）")
+    except:
+        pass
+except Exception as e:
+    print(f"⚠️  百度OCR API配置失败: {e}")
 
 # 数据库连接
 def get_db():
@@ -791,6 +822,59 @@ def recognize_speech():
         
     except Exception as e:
         print(f"💥 语音识别API异常: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务异常: {str(e)}'
+        }), 500
+
+# ====== OCR文字识别 API ======
+@app.route('/api/ocr/recognize', methods=['POST'])
+@handle_errors
+def recognize_ocr():
+    """OCR文字识别接口"""
+    print("📷 收到OCR识别请求")
+    
+    try:
+        # 检查是否有图片文件
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': '未找到图片文件'}), 400
+        
+        image_file = request.files['image']
+        if image_file.filename == '':
+            return jsonify({'success': False, 'error': '图片文件为空'}), 400
+        
+        # 获取参数
+        accurate = request.form.get('accurate', 'false').lower() == 'true'  # 是否使用高精度版
+        language_type = request.form.get('language', 'ENG')  # 默认英文
+        
+        # 读取图片数据
+        image_data = image_file.read()
+        
+        print(f"📋 请求参数:")
+        print(f"   - 高精度: {accurate}")
+        print(f"   - 语言: {language_type}")
+        print(f"   - 图片大小: {len(image_data)} 字节")
+        
+        # 调用OCR服务
+        result = ocr_service.recognize_text(
+            image_data=image_data,
+            accurate=accurate,
+            language_type=language_type
+        )
+        
+        print(f"📝 OCR服务返回:")
+        print(f"   - 成功: {result.get('success')}")
+        if result.get('success'):
+            print(f"   - 识别文本: {result.get('text', '')}")
+        else:
+            print(f"   - 错误: {result.get('error')}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"💥 OCR API异常: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
