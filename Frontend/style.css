@@ -1800,6 +1800,20 @@ footer {
     object-fit: contain;
 }
 
+.memory-image-clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.memory-image-clickable:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.memory-image-clickable:active {
+    transform: scale(0.98);
+}
+
 .memory-image-loading {
     color: #999;
     font-size: 14px;

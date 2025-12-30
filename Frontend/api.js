@@ -122,8 +122,8 @@ class WendyAPI {
     }
 
     // ====== 图片服务 ======
-    async getWordImage(keyword, lang = 'zh') {
-        return await this.request(`/api/word/image?keyword=${encodeURIComponent(keyword)}&lang=${lang}`);
+    async getWordImage(keyword, lang = 'zh', perPage = 3) {
+        return await this.request(`/api/word/image?keyword=${encodeURIComponent(keyword)}&lang=${lang}&per_page=${perPage}`);
     }
 
     // ====== 单词详情服务 ======
@@ -1740,9 +1740,9 @@ class WendyApp {
         const container = document.getElementById('memory-image-container');
         if (!container) return;
 
-        // 如果已有URL，直接显示
+        // 如果已有URL，直接显示（添加点击事件）
         if (existingUrl) {
-            container.innerHTML = `<img src="${existingUrl}" alt="记忆图片" class="memory-image" onerror="this.parentElement.innerHTML='<div class=\\'memory-image-error\\'>图片加载失败</div>'">`;
+            this.renderMemoryImage(container, existingUrl, word, memoryImageKeyword);
             return;
         }
 
@@ -1752,7 +1752,7 @@ class WendyApp {
                 // 获取记忆图片
                 const imageResult = await this.api.getWordImage(memoryImageKeyword, 'en');
                 if (imageResult.success && imageResult.image_url) {
-                    container.innerHTML = `<img src="${imageResult.image_url}" alt="记忆图片" class="memory-image" onerror="this.parentElement.innerHTML='<div class=\\'memory-image-error\\'>图片加载失败</div>'">`;
+                    this.renderMemoryImage(container, imageResult.image_url, word, memoryImageKeyword);
                     
                     // 保存记忆图片URL到数据库
                     await this.saveMemoryImageUrl(word, imageResult.image_url);
@@ -1769,6 +1769,103 @@ class WendyApp {
         // 如果没有关键词（理论上不会到这里，因为getWordDetails已经包含了），作为备用方案
         // 这种情况不应该发生，但保留作为容错
         container.innerHTML = '<div class="memory-image-error">记忆图片关键词缺失</div>';
+    }
+
+    renderMemoryImage(container, imageUrl, word, memoryImageKeyword) {
+        // 创建图片元素，添加点击事件
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = '记忆图片（点击切换）';
+        img.className = 'memory-image memory-image-clickable';
+        img.title = '点击切换其他图片';
+        img.onerror = function() {
+            container.innerHTML = '<div class="memory-image-error">图片加载失败</div>';
+        };
+        
+        // 添加点击事件：随机切换图片
+        img.addEventListener('click', () => {
+            this.refreshMemoryImage(word, memoryImageKeyword, imageUrl);
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(img);
+    }
+
+    async refreshMemoryImage(word, memoryImageKeyword = '', currentImageUrl = '') {
+        const container = document.getElementById('memory-image-container');
+        if (!container) return;
+
+        // 如果没有关键词，尝试从数据库获取
+        if (!memoryImageKeyword) {
+            try {
+                const detail = await this.api.getWordDetail(word);
+                if (detail.success && detail.memory_image_keyword) {
+                    memoryImageKeyword = detail.memory_image_keyword;
+                } else {
+                    this.showNotification('无法获取图片关键词', 'warning');
+                    return;
+                }
+            } catch (error) {
+                console.error('获取关键词失败:', error);
+                this.showNotification('无法获取图片关键词', 'warning');
+                return;
+            }
+        }
+
+        // 显示加载状态
+        const currentImg = container.querySelector('.memory-image');
+        if (currentImg) {
+            currentImg.style.opacity = '0.5';
+            currentImg.style.pointerEvents = 'none';
+        } else {
+            container.innerHTML = '<div class="memory-image-loading">正在加载新图片...</div>';
+        }
+
+        try {
+            // 获取多张图片（10张），然后随机选择一张
+            const imageResult = await this.api.getWordImage(memoryImageKeyword, 'en', 10);
+            
+            if (imageResult.success && imageResult.images && imageResult.images.length > 0) {
+                // 过滤掉当前显示的图片
+                const availableImages = imageResult.images.filter(img => 
+                    img.webformat !== currentImageUrl && 
+                    img.large !== currentImageUrl &&
+                    img.preview !== currentImageUrl
+                );
+                
+                // 如果没有其他图片，使用所有图片
+                const imagesToChoose = availableImages.length > 0 ? availableImages : imageResult.images;
+                
+                // 随机选择一张
+                const randomIndex = Math.floor(Math.random() * imagesToChoose.length);
+                const selectedImage = imagesToChoose[randomIndex];
+                const newImageUrl = selectedImage.webformat || selectedImage.large || selectedImage.preview;
+                
+                if (newImageUrl) {
+                    // 更新显示的图片
+                    this.renderMemoryImage(container, newImageUrl, word, memoryImageKeyword);
+                    
+                    // 保存新的图片URL到数据库
+                    await this.saveMemoryImageUrl(word, newImageUrl);
+                    
+                    this.showNotification('已切换到新图片', 'success');
+                } else {
+                    throw new Error('未找到可用的图片URL');
+                }
+            } else {
+                throw new Error(imageResult.error || '未找到相关图片');
+            }
+        } catch (error) {
+            console.error('刷新记忆图片失败:', error);
+            // 恢复原图片显示
+            if (currentImg) {
+                currentImg.style.opacity = '1';
+                currentImg.style.pointerEvents = 'auto';
+            } else {
+                container.innerHTML = '<div class="memory-image-error">切换图片失败</div>';
+            }
+            this.showNotification('切换图片失败，请稍后重试', 'error');
+        }
     }
 
     async saveMemoryImageUrl(word, imageUrl) {

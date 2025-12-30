@@ -859,6 +859,14 @@ def get_word_image():
     try:
         keyword = request.args.get('keyword', '').strip()
         lang = request.args.get('lang', 'zh')  # 默认中文搜索
+        per_page = request.args.get('per_page', '3')  # 返回图片数量，默认3张
+        
+        # 转换为整数，确保在合理范围内
+        try:
+            per_page = int(per_page)
+            per_page = max(1, min(per_page, 20))  # 限制在1-20之间
+        except (ValueError, TypeError):
+            per_page = 3
         
         if not keyword:
             return jsonify({'success': False, 'error': '关键词不能为空'}), 400
@@ -866,9 +874,10 @@ def get_word_image():
         print(f"📋 请求参数:")
         print(f"   - 关键词: {keyword}")
         print(f"   - 语言: {lang}")
+        print(f"   - 数量: {per_page}")
         
         # 调用图片服务
-        result = image_service.search_image(keyword, lang=lang, per_page=3)
+        result = image_service.search_image(keyword, lang=lang, per_page=per_page)
         
         print(f"📝 图片服务返回:")
         print(f"   - 成功: {result.get('success')}")
