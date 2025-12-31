@@ -100,7 +100,7 @@ docker stats wendy-translator
 
 ### 数据库初始化失败
 1. 检查数据目录权限：`ls -la data/database/`
-2. 手动初始化：进入容器执行 `python Backend/database/database_init.py`
+2. 手动初始化：进入容器执行 `python backend/scripts/database_init.py`
 
 ### 健康检查失败
 1. 检查应用是否正常启动

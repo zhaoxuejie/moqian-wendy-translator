@@ -35,7 +35,7 @@ def install_dependencies():
     """安装依赖包（仅在需要时安装）"""
     print("📦 检查依赖包...")
     try:
-        # 切换到Config目录
+        # 切换到config目录
         config_dir = os.path.join(os.path.dirname(__file__))
         requirements_path = os.path.join(config_dir, 'requirements.txt')
         
@@ -70,7 +70,7 @@ def init_database():
     """初始化数据库"""
     print("💾 初始化数据库...")
     try:
-        subprocess.check_call([sys.executable, "backend/database/database_init.py"])
+        subprocess.check_call([sys.executable, "backend/scripts/database_init.py"])
         print("✅ 数据库初始化完成")
         return True
     except subprocess.CalledProcessError as e:
@@ -91,7 +91,7 @@ def configure_translation_api():
         
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
-        services_dir = os.path.join(project_root, "Backend", "services")
+        services_dir = os.path.join(project_root, "backend", "services")
         
         has_config_file = (
             os.path.exists(os.path.join(services_dir, "configure_api.py")) or
@@ -201,7 +201,7 @@ def main():
     # 检查必要文件
     required_files = [
         'backend/core/app.py', 
-        'backend/database/database_init.py', 
+        'backend/scripts/database_init.py', 
         'frontend/index.html', 
         'frontend/api.js'
     ]

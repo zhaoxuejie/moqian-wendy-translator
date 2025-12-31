@@ -16,11 +16,20 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-def init_database():
+def init_database(quiet=False):
     """初始化数据库"""
-    # 数据库文件路径
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(script_dir, 'wendy_translator.db')
+    # 数据库文件路径：优先使用环境变量，否则使用默认路径
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        # 默认路径：项目根目录的 database/wendy_translator.db
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))  # backend -> 项目根目录
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
+    
+    # 确保目录存在
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
     
     # 连接数据库
     conn = sqlite3.connect(db_path)
@@ -209,11 +218,12 @@ def init_database():
         
         # 提交事务
         conn.commit()
-        print("✅ 数据库初始化成功！")
-        print(f"📍 数据库位置: {db_path}")
-        print(f"📊 初始数据:")
-        print(f"   - 用户: 1")
-        print(f"   - 单词本: {len(initial_words)} 个单词")
+        if not quiet:
+            print("✅ 数据库初始化成功！")
+            print(f"📍 数据库位置: {db_path}")
+            print(f"📊 初始数据:")
+            print(f"   - 用户: 1")
+            print(f"   - 单词本: {len(initial_words)} 个单词")
         
     except Exception as e:
         print(f"❌ 数据库初始化失败: {e}")
@@ -221,9 +231,13 @@ def init_database():
     finally:
         conn.close()
 
-def check_database():
+def check_database(quiet=False):
     """检查数据库状态"""
-    db_path = os.path.join(os.path.dirname(__file__), 'wendy_translator.db')
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
     
     if not os.path.exists(db_path):
         print("❌ 数据库文件不存在")
@@ -241,19 +255,20 @@ def check_database():
         """)
         tables = [row[0] for row in cursor.fetchall()]
         
-        print("✅ 数据库连接成功")
-        print(f"📋 数据表: {', '.join(tables)}")
-        
-        # 检查数据统计
-        if 'users' in tables:
-            cursor.execute('SELECT COUNT(*) FROM users')
-            user_count = cursor.fetchone()[0]
-            print(f"👥 用户数: {user_count}")
-        
-        if 'wordbook' in tables:
-            cursor.execute('SELECT COUNT(*) FROM wordbook')
-            word_count = cursor.fetchone()[0]
-            print(f"📖 单词数: {word_count}")
+        if not quiet:
+            print("✅ 数据库连接成功")
+            print(f"📋 数据表: {', '.join(tables)}")
+            
+            # 检查数据统计
+            if 'users' in tables:
+                cursor.execute('SELECT COUNT(*) FROM users')
+                user_count = cursor.fetchone()[0]
+                print(f"👥 用户数: {user_count}")
+            
+            if 'wordbook' in tables:
+                cursor.execute('SELECT COUNT(*) FROM wordbook')
+                word_count = cursor.fetchone()[0]
+                print(f"📖 单词数: {word_count}")
         
         return True
         
@@ -265,9 +280,13 @@ def check_database():
     finally:
         conn.close()
 
-def ensure_word_details_table():
+def ensure_word_details_table(quiet=False):
     """确保word_details表存在（用于已存在的数据库）"""
-    db_path = os.path.join(os.path.dirname(__file__), 'wendy_translator.db')
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
     
     if not os.path.exists(db_path):
         return False
@@ -284,7 +303,8 @@ def ensure_word_details_table():
         table_exists = cursor.fetchone() is not None
         
         if not table_exists:
-            print("📦 创建word_details表...")
+            if not quiet:
+                print("📦 创建word_details表...")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS word_details (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,17 +324,20 @@ def ensure_word_details_table():
                 )
             """)
             conn.commit()
-            print("✅ word_details表创建成功")
+            if not quiet:
+                print("✅ word_details表创建成功")
             return True
         else:
             # 检查是否需要添加memory_image_keyword字段
             cursor.execute("PRAGMA table_info(word_details)")
             columns = [column[1] for column in cursor.fetchall()]
             if 'memory_image_keyword' not in columns:
-                print("📦 添加memory_image_keyword字段...")
+                if not quiet:
+                    print("📦 添加memory_image_keyword字段...")
                 cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
                 conn.commit()
-                print("✅ memory_image_keyword字段添加成功")
+                if not quiet:
+                    print("✅ memory_image_keyword字段添加成功")
         
         # 检查game_records表是否存在
         cursor.execute("""
@@ -324,7 +347,8 @@ def ensure_word_details_table():
         game_records_exists = cursor.fetchone() is not None
         
         if not game_records_exists:
-            print("📦 创建game_records表...")
+            if not quiet:
+                print("📦 创建game_records表...")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS game_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -340,7 +364,8 @@ def ensure_word_details_table():
                 )
             """)
             conn.commit()
-            print("✅ game_records表创建成功")
+            if not quiet:
+                print("✅ game_records表创建成功")
         
         return True
     except Exception as e:
@@ -353,19 +378,30 @@ def ensure_word_details_table():
         conn.close()
 
 if __name__ == "__main__":
-    print("🚀 温蒂翻译助手数据库初始化")
-    print("=" * 40)
+    quiet_mode = os.getenv('DATABASE_INIT_QUIET', 'false').lower() == 'true'
+    
+    if not quiet_mode:
+        print("🚀 温蒂翻译助手数据库初始化")
+        print("=" * 40)
     
     # 检查是否需要初始化
-    db_path = os.path.join(os.path.dirname(__file__), 'wendy_translator.db')
-    if not os.path.exists(db_path):
-        print("📦 首次运行，正在创建数据库...")
-        init_database()
-    else:
-        print("🔍 检查数据库状态...")
-        check_database()
-        # 确保word_details表存在
-        ensure_word_details_table()
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
     
-    print("=" * 40)
-    print("✨ 数据库操作完成！")
+    if not os.path.exists(db_path):
+        if not quiet_mode:
+            print("📦 首次运行，正在创建数据库...")
+        init_database(quiet=quiet_mode)
+    else:
+        if not quiet_mode:
+            print("🔍 检查数据库状态...")
+        check_database(quiet=quiet_mode)
+        # 确保word_details表存在
+        ensure_word_details_table(quiet=quiet_mode)
+    
+    if not quiet_mode:
+        print("=" * 40)
+        print("✨ 数据库操作完成！")

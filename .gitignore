@@ -61,6 +61,10 @@ Backend/database/wendy_translator.db
 Backend/database/*.db
 Backend/database/*.sqlite
 Backend/database/*.sqlite3
+# 根目录数据库文件夹（Docker 使用）
+database/*.db
+database/*.sqlite
+database/*.sqlite3
 
 # 环境变量和配置文件（包含敏感信息）
 .env

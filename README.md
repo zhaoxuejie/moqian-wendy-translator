@@ -54,7 +54,7 @@
 
 ```
 wendy-translator/
-├── 📱 Frontend/               # 前端文件（注意：实际目录名为Frontend）
+├── 📱 frontend/               # 前端文件
 │   ├── index.html           # 主页面
 │   ├── api.js               # API客户端和核心逻辑
 │   │                         # - 翻译结果显示
@@ -66,7 +66,7 @@ wendy-translator/
 │       ├── kenan.jpg        # 柯南头像
 │       ├── xiaowanzi.jpg    # 小丸子头像
 │       └── duola.jpg        # 哆啦A梦头像
-├── 🖥️ Backend/               # 后端文件（注意：实际目录名为Backend）
+├── 🖥️ backend/               # 后端文件
 │   ├── core/                # 核心应用
 │   │   ├── app.py          # Flask主服务器
 │   │   │                   # - RESTful API路由
@@ -107,7 +107,7 @@ wendy-translator/
 │       ├── test_api.py      # API测试
 │       ├── test_translation_logs.py # 翻译日志测试
 │       └── test_*.py        # 其他测试文件
-├── ⚙️ Config/                # 配置文件（注意：实际目录名为Config）
+├── ⚙️ config/                # 配置文件
 │   ├── requirements.txt     # Python依赖
 │   ├── requirements.txt     # Python依赖
 │   └── start_app.py         # 启动脚本
@@ -149,7 +149,7 @@ chmod +x start.sh
 
 **方法二：配置目录启动**
 ```bash
-cd Config
+cd config
 python start_app.py
 ```
 
@@ -157,13 +157,13 @@ python start_app.py
 
 1. 安装依赖:
 ```bash
-cd Config
+cd config
 pip install -r requirements.txt
 ```
 
 2. 初始化数据库:
 ```bash
-cd ../backend/database
+cd ../backend/scripts
 python database_init.py
 ```
 
@@ -507,9 +507,9 @@ await wendyApp.handleAddToWordbook();
 - 验证头像图标是否正确显示
 
 ### 数据保存失败
-- 确认数据库文件存在 (`backend/database/wendy_translator.db`)
+- 确认数据库文件存在 (`database/wendy_translator.db`)
 - 检查文件权限
-- 重新初始化数据库：`python backend/database/database_init.py`
+- 重新初始化数据库：`python backend/scripts/database_init.py`
 
 ### 语音设置问题
 - **语音选项不显示**：确认浏览器支持Web Speech API（Chrome、Edge、Safari等）
@@ -527,12 +527,12 @@ await wendyApp.handleAddToWordbook();
 ### 测试文件
 项目包含测试文件用于功能验证：
 
-- `Backend/tests/test_api.py` - 后端API测试
+- `backend/tests/test_api.py` - 后端API测试
 
 ### 调试指南
 1. **前端调试**：打开浏览器开发者工具查看控制台日志
 2. **后端调试**：查看Flask服务器的控制台输出
-3. **数据库调试**：使用SQLite工具查看 `wendy_translator.db`
+3. **数据库调试**：使用SQLite工具查看 `database/wendy_translator.db`
 4. **API调试**：查看 `backend/tests/` 目录下的测试用例
 
 ### 性能优化

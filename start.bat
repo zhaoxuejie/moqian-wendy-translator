@@ -14,8 +14,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 切换到Config目录运行启动脚本
-cd Config
+REM 切换到config目录运行启动脚本
+cd config
 python start_app.py
 
 pause

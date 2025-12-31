@@ -10,13 +10,15 @@ services:
       - "5000:5000"
     volumes:
       # 持久化数据库文件
-      - ./data/database:/app/Backend/database
+      - ./database:/app/database
       # 可选：如果需要热更新前端文件
-      # - ./Frontend:/app/Frontend:ro
+      # - ./frontend:/app/frontend:ro
     environment:
       # Flask 配置
       - FLASK_ENV=production
-      - FLASK_APP=Backend/core/app.py
+      - FLASK_APP=backend/core/app.py
+      # 数据库路径
+      - DATABASE_PATH=/app/database/wendy_translator.db
       
       # 翻译 API 配置（可选，通过环境变量配置）
       - BAIDU_APPID=${BAIDU_APPID:-}

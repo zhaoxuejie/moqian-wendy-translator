@@ -56,7 +56,9 @@ CORS(app)  # 允许跨域请求
 
 # 配置
 import os
-DATABASE = os.path.join(os.path.dirname(__file__), '../database/wendy_translator.db')
+# 数据库路径：优先使用环境变量，否则使用默认路径
+DATABASE = os.getenv('DATABASE_PATH', 
+    os.path.join(os.path.dirname(__file__), '../../database/wendy_translator.db'))
 SECRET_KEY = 'wendy-translator-secret-key-2024'
 
 # 导入DeepSeek服务
@@ -1142,7 +1144,7 @@ if __name__ == '__main__':
     
     # 检查数据库
     if not os.path.exists(DATABASE):
-        print("❌ 数据库不存在，请先运行 python database_init.py")
+        print("❌ 数据库不存在，请先运行 python backend/scripts/database_init.py")
         exit(1)
     
     # 确保word_details表存在
@@ -1177,7 +1179,7 @@ if __name__ == '__main__':
         conn.close()
     except Exception as e:
         print(f"⚠️  检查word_details表时出错: {e}")
-        print("   建议运行 python Backend/database/database_init.py 来初始化数据库")
+        print("   建议运行 python backend/scripts/database_init.py 来初始化数据库")
     
     print(f"📁 工作目录: {os.getcwd()}")
     print(f"💾 数据库: {DATABASE}")

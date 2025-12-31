@@ -9,6 +9,6 @@ if ! command -v python &> /dev/null; then
     exit 1
 fi
 
-# 切换到Config目录运行启动脚本
-cd Config
+# 切换到config目录运行启动脚本
+cd config
 python start_app.py

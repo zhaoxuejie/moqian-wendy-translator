@@ -52,7 +52,7 @@ def test_translate_api():
     except requests.exceptions.ConnectionError:
         print(f"\n❌ 连接失败!")
         print(f"   请确保应用程序正在运行: http://localhost:5000")
-        print(f"   启动命令: cd d:/MyCodeBuddy/wendy-translator && python Config/start_app.py")
+        print(f"   启动命令: cd d:/MyCodeBuddy/wendy-translator && python config/start_app.py")
     except Exception as e:
         print(f"\n❌ 请求异常: {e}")
 
@@ -79,4 +79,4 @@ if __name__ == "__main__":
     else:
         print("\n🚀 请先启动应用程序:")
         print("   cd d:/MyCodeBuddy/wendy-translator")
-        print("   python Config/start_app.py")
+        print("   python config/start_app.py")

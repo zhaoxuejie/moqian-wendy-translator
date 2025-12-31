@@ -7,31 +7,34 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    FLASK_APP=Backend/core/app.py \
+    FLASK_APP=backend/core/app.py \
     FLASK_ENV=production
+
+# 使用阿里云镜像源加速 apt（中国用户）
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
-    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
-COPY Config/requirements.txt /app/requirements.txt
+COPY config/requirements.txt /app/requirements.txt
 
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
-COPY Backend/ /app/Backend/
-COPY Frontend/ /app/Frontend/
-COPY Config/ /app/Config/
+COPY backend/ /app/backend/
+COPY frontend/ /app/frontend/
+COPY config/ /app/config/
 
 # 创建数据库目录
-RUN mkdir -p /app/Backend/database
+RUN mkdir -p /app/database
 
 # 设置权限
-RUN chmod +x /app/Backend/database/database_init.py
+RUN chmod +x /app/backend/scripts/database_init.py
 
 # 暴露端口
 EXPOSE 5000
@@ -39,10 +42,12 @@ EXPOSE 5000
 # 创建启动脚本
 RUN echo '#!/bin/bash\n\
 set -e\n\
+cd /app\n\
+export DATABASE_PATH="/app/database/wendy_translator.db"\n\
 echo "💾 初始化数据库..."\n\
-python Backend/database/database_init.py\n\
+python backend/scripts/database_init.py\n\
 echo "🚀 启动应用..."\n\
-python Backend/core/app.py\n\
+exec python backend/core/app.py\n\
 ' > /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 # 启动应用
