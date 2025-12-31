@@ -12,9 +12,11 @@
 - 百度OCR和百度语音识别可以使用同一个应用的API Key和Secret Key
 - 如果此处不配置，系统会自动尝试使用语音识别的API Key
 - 如果两个服务使用同一个应用，只需在一个地方配置即可
+- 优先从环境变量读取，如果没有则使用配置文件中的值
 """
 
-# 百度OCR API配置（如果与语音识别使用不同的应用，请在此配置）
-BAIDU_OCR_API_KEY = "9eVxZ3FrLMJIxdyTLMelH7SG"  # 您的API Key（可与语音识别共用，留空则使用语音识别的Key）
-BAIDU_OCR_SECRET_KEY = "TqGzQo4CmpMfSTNP4u0tthaQXRYLN3tC"  # 您的Secret Key（可与语音识别共用，留空则使用语音识别的Key）
+# 优先从环境变量读取，如果没有则使用配置文件中的值
+import os
+BAIDU_OCR_API_KEY = os.getenv('BAIDU_OCR_API_KEY') or "9eVxZ3FrLMJIxdyTLMelH7SG"  # 您的API Key（可与语音识别共用，留空则使用语音识别的Key）
+BAIDU_OCR_SECRET_KEY = os.getenv('BAIDU_OCR_SECRET_KEY') or "TqGzQo4CmpMfSTNP4u0tthaQXRYLN3tC"  # 您的Secret Key（可与语音识别共用，留空则使用语音识别的Key）
 

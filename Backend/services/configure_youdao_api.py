@@ -8,8 +8,10 @@
 # 编码处理由主程序统一管理
 # 如果作为独立脚本运行，会在 if __name__ == "__main__" 中处理
 
-YOUDAO_APP_KEY = "00c2ffd6fba5cfb5"      # 应用ID
-YOUDAO_APP_SECRET = "ZT0BEjPWldujDmjjsnBPEaMYkEI3C2Ks"  # 应用密钥
+# 优先从环境变量读取，如果没有则使用配置文件中的值
+import os
+YOUDAO_APP_KEY = os.getenv('YOUDAO_APPKEY') or os.getenv('YOUDAO_TRANSLATE_APPKEY') or "00c2ffd6fba5cfb5"      # 应用ID
+YOUDAO_APP_SECRET = os.getenv('YOUDAO_SECRET') or os.getenv('YOUDAO_TRANSLATE_SECRET') or "ZT0BEjPWldujDmjjsnBPEaMYkEI3C2Ks"  # 应用密钥
 
 def setup_youdao_api():
     """配置有道翻译API"""

@@ -315,7 +315,6 @@ def ensure_word_details_table():
                 cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
                 conn.commit()
                 print("✅ memory_image_keyword字段添加成功")
-            print("✅ word_details表已存在")
         
         # 检查game_records表是否存在
         cursor.execute("""
@@ -342,8 +341,6 @@ def ensure_word_details_table():
             """)
             conn.commit()
             print("✅ game_records表创建成功")
-        else:
-            print("✅ game_records表已存在")
         
         return True
     except Exception as e:

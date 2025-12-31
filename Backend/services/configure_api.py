@@ -10,8 +10,10 @@
 # 如果作为独立脚本运行，会在 if __name__ == "__main__" 中处理
 
 # 🔧 在这里配置你的百度翻译API信息
-BAIDU_APPID = "20251126002506512"  # 替换为你的APP ID
-BAIDU_SECRET = "_i1JUTEK3Zc6a8JQhhzn"  # 替换为你的密钥
+# 优先从环境变量读取，如果没有则使用配置文件中的值
+import os
+BAIDU_APPID = os.getenv('BAIDU_APPID') or os.getenv('BAIDU_TRANSLATE_APPID') or "20251126002506512"  # 替换为你的APP ID
+BAIDU_SECRET = os.getenv('BAIDU_SECRET') or os.getenv('BAIDU_TRANSLATE_SECRET') or "_i1JUTEK3Zc6a8JQhhzn"  # 替换为你的密钥
 
 def setup_api():
     """配置翻译API"""

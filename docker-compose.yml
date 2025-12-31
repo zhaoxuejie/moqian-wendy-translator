@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  wendy-translator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wendy-translator
+    ports:
+      - "5000:5000"
+    volumes:
+      # 持久化数据库文件
+      - ./data/database:/app/Backend/database
+      # 可选：如果需要热更新前端文件
+      # - ./Frontend:/app/Frontend:ro
+    environment:
+      # Flask 配置
+      - FLASK_ENV=production
+      - FLASK_APP=Backend/core/app.py
+      
+      # 翻译 API 配置（可选，通过环境变量配置）
+      - BAIDU_APPID=${BAIDU_APPID:-}
+      - BAIDU_SECRET=${BAIDU_SECRET:-}
+      - YOUDAO_APPKEY=${YOUDAO_APPKEY:-}
+      - YOUDAO_SECRET=${YOUDAO_SECRET:-}
+      
+      # DeepSeek API 配置（可选）
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      
+      # 百度语音识别 API（可选）
+      - BAIDU_SPEECH_APP_ID=${BAIDU_SPEECH_APP_ID:-}
+      - BAIDU_SPEECH_API_KEY=${BAIDU_SPEECH_API_KEY:-}
+      - BAIDU_SPEECH_SECRET_KEY=${BAIDU_SPEECH_SECRET_KEY:-}
+      
+      # 百度 OCR API（可选）
+      - BAIDU_OCR_API_KEY=${BAIDU_OCR_API_KEY:-}
+      - BAIDU_OCR_SECRET_KEY=${BAIDU_OCR_SECRET_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - wendy-network
+
+networks:
+  wendy-network:
+    driver: bridge
+
+volumes:
+  database-data:
+    driver: local
+
