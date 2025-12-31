@@ -15,7 +15,7 @@ cp .env.example .env
 
 ### 2. 创建数据目录
 ```bash
-mkdir -p data/database
+mkdir -p database
 ```
 
 ### 3. 构建并启动
@@ -35,7 +35,7 @@ docker-compose down
 
 ## 数据持久化
 
-数据库文件会保存在 `./data/database/` 目录中，即使容器删除，数据也不会丢失。
+数据库文件会保存在 `./database/` 目录中，即使容器删除，数据也不会丢失。
 
 ## 更新部署
 
@@ -54,7 +54,7 @@ docker-compose up -d --build
    - 负载均衡（如果需要）
 
 2. **数据备份**
-   - 定期备份 `data/database/` 目录
+   - 定期备份 `database/` 目录
    - 建议使用定时任务自动备份
 
 3. **安全配置**
@@ -99,7 +99,7 @@ docker stats wendy-translator
 3. 检查环境变量配置是否正确
 
 ### 数据库初始化失败
-1. 检查数据目录权限：`ls -la data/database/`
+1. 检查数据目录权限：`ls -la database/`
 2. 手动初始化：进入容器执行 `python backend/scripts/database_init.py`
 
 ### 健康检查失败
