@@ -9,6 +9,85 @@ class ComboRewardsGame {
         this.api = api;
         this.app = app;
         this.gameState = null;
+        this.audioContext = null; // 音频上下文
+    }
+    
+    // 初始化音频上下文（延迟初始化，避免浏览器限制）
+    initAudioContext() {
+        if (!this.audioContext) {
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (error) {
+                console.warn('音频上下文初始化失败:', error);
+            }
+        }
+        return this.audioContext;
+    }
+    
+    // 音效生成器
+    createSound(frequency, duration, type = 'sine', volume = 0.3) {
+        try {
+            const audioContext = this.initAudioContext();
+            if (!audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = type;
+            
+            // 音量控制（从设置中获取）
+            const volumeSlider = document.getElementById('volume-slider');
+            const baseVolume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+            const finalVolume = baseVolume * volume;
+            
+            gainNode.gain.setValueAtTime(finalVolume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        } catch (error) {
+            // 静默失败，不影响游戏
+        }
+    }
+    
+    // 播放答对音效
+    playCorrectSound() {
+        // 上升的音调
+        this.createSound(600, 0.1, 'sine', 0.25);
+        setTimeout(() => this.createSound(800, 0.1, 'sine', 0.25), 50);
+    }
+    
+    // 播放答错音效
+    playWrongSound() {
+        // 低沉的错误音
+        this.createSound(300, 0.2, 'sine', 0.2);
+    }
+    
+    // 播放连击里程碑音效
+    playComboMilestoneSound(combo) {
+        // 根据连击数调整音调，连击越高音调越高
+        const baseFreq = 500 + Math.min(combo * 20, 500);
+        this.createSound(baseFreq, 0.2, 'sine', 0.35);
+    }
+    
+    // 播放连击保护音效
+    playComboProtectionSound() {
+        // 保护音效：温和的提示音
+        this.createSound(700, 0.15, 'sine', 0.25);
+        setTimeout(() => this.createSound(800, 0.15, 'sine', 0.25), 80);
+    }
+    
+    // 播放游戏结束音效
+    playGameOverSound() {
+        // 下降的音调
+        const notes = [800, 600, 400];
+        notes.forEach((freq, index) => {
+            setTimeout(() => this.createSound(freq, 0.25, 'sine', 0.3), index * 120);
+        });
     }
 
     async start() {
@@ -339,6 +418,9 @@ class ComboRewardsGame {
         // 更新倍数
         this.gameState.comboMultiplier = this.calculateMultiplier(this.gameState.currentCombo);
         
+        // 播放答对音效
+        this.playCorrectSound();
+        
         // 检查连击里程碑奖励
         this.checkComboMilestone();
         
@@ -355,11 +437,16 @@ class ComboRewardsGame {
             this.gameState.comboProtection = true;
             // 只扣分，不重置连击
             this.showComboProtection();
+            // 播放连击保护音效
+            this.playComboProtectionSound();
         } else {
             // 重置连击
             this.gameState.currentCombo = 0;
             this.gameState.comboMultiplier = 1.0;
             this.gameState.comboProtection = false;
+            
+            // 播放答错音效
+            this.playWrongSound();
             
             // 无限模式：增加错误计数
             if (this.gameState.gameMode === 'endless') {
@@ -419,6 +506,8 @@ class ComboRewardsGame {
         
         if (bonus > 0) {
             this.showComboMilestone(currentCombo, bonus);
+            // 播放连击里程碑音效
+            this.playComboMilestoneSound(currentCombo);
         }
     }
 
@@ -540,6 +629,8 @@ class ComboRewardsGame {
 
     endGame() {
         this.gameState.isPlaying = false;
+        // 播放游戏结束音效
+        this.playGameOverSound();
         this.showResult();
     }
 

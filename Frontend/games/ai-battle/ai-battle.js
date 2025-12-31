@@ -9,6 +9,93 @@ class AIBattleGame {
         this.api = api;
         this.app = app;
         this.gameState = null;
+        this.audioContext = null; // 音频上下文
+    }
+    
+    // 初始化音频上下文（延迟初始化，避免浏览器限制）
+    initAudioContext() {
+        if (!this.audioContext) {
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (error) {
+                console.warn('音频上下文初始化失败:', error);
+            }
+        }
+        return this.audioContext;
+    }
+    
+    // 音效生成器
+    createSound(frequency, duration, type = 'sine', volume = 0.3) {
+        try {
+            const audioContext = this.initAudioContext();
+            if (!audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = type;
+            
+            // 音量控制（从设置中获取）
+            const volumeSlider = document.getElementById('volume-slider');
+            const baseVolume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+            const finalVolume = baseVolume * volume;
+            
+            gainNode.gain.setValueAtTime(finalVolume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        } catch (error) {
+            // 静默失败，不影响游戏
+        }
+    }
+    
+    // 播放玩家答对音效
+    playPlayerCorrectSound() {
+        // 上升的音调
+        this.createSound(600, 0.1, 'sine', 0.25);
+        setTimeout(() => this.createSound(800, 0.1, 'sine', 0.25), 50);
+    }
+    
+    // 播放玩家答错音效
+    playPlayerWrongSound() {
+        // 低沉的错误音
+        this.createSound(300, 0.2, 'sine', 0.2);
+    }
+    
+    // 播放AI答对音效
+    playAICorrectSound() {
+        // AI答对：稍有不同的音调
+        this.createSound(500, 0.1, 'sine', 0.2);
+        setTimeout(() => this.createSound(700, 0.1, 'sine', 0.2), 50);
+    }
+    
+    // 播放AI答错音效
+    playAIWrongSound() {
+        // AI答错：更低的音调
+        this.createSound(250, 0.2, 'sine', 0.15);
+    }
+    
+    // 播放玩家获胜音效
+    playPlayerWinSound() {
+        // 胜利的音阶
+        const notes = [523, 659, 784, 1047, 1319];
+        notes.forEach((freq, index) => {
+            setTimeout(() => this.createSound(freq, 0.15, 'sine', 0.35), index * 80);
+        });
+    }
+    
+    // 播放AI获胜音效
+    playAIWinSound() {
+        // 失败的下降音调
+        const notes = [600, 500, 400, 300];
+        notes.forEach((freq, index) => {
+            setTimeout(() => this.createSound(freq, 0.2, 'sine', 0.25), index * 100);
+        });
     }
 
     async start() {
@@ -408,6 +495,12 @@ class AIBattleGame {
                 player.maxCombo = player.currentCombo;
             }
             
+            // 播放玩家答对音效
+            this.playPlayerCorrectSound();
+            
+            // 播放玩家答对音效
+            this.playPlayerCorrectSound();
+            
             // 连击奖励
             this.checkComboReward('player');
             
@@ -416,6 +509,8 @@ class AIBattleGame {
         } else {
             player.currentCombo = 0;
             player.health = Math.max(0, player.health - 10);
+            // 播放玩家答错音效
+            this.playPlayerWrongSound();
             this.showHealthChange('player', -10);
         }
     }
@@ -483,6 +578,9 @@ class AIBattleGame {
                 ai.maxCombo = ai.currentCombo;
             }
             
+            // 播放AI答对音效
+            this.playAICorrectSound();
+            
             // 连击奖励
             this.checkComboReward('ai');
             
@@ -491,6 +589,8 @@ class AIBattleGame {
         } else {
             ai.currentCombo = 0;
             ai.health = Math.max(0, ai.health - 10);
+            // 播放AI答错音效
+            this.playAIWrongSound();
             this.showHealthChange('ai', -10);
         }
     }
@@ -616,6 +716,12 @@ class AIBattleGame {
 
     endGame(winner) {
         this.gameState.isPlaying = false;
+        // 播放游戏结束音效
+        if (winner === 'player') {
+            this.playPlayerWinSound();
+        } else {
+            this.playAIWinSound();
+        }
         this.showResult(winner);
     }
 

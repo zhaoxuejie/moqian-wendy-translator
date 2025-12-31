@@ -190,6 +190,7 @@ class WendyApp {
         this.comboRewardsGame = null; // 连击奖励游戏实例
         this.aiBattleGame = null; // AI对战游戏实例
         this.wordBlitzGame = null; // 单词速射游戏实例
+        this.wordMatchGame = null; // 记忆配对游戏实例
         
         // 语音名称到简短昵称的映射表
         this.voiceNicknames = {
@@ -2745,10 +2746,12 @@ class WendyApp {
                     this.startComboRewards();
                 } else if (gameType === 'ai-battle') {
                     this.startAIBattle();
-                } else if (gameType === 'word-blitz') {
-                    this.startWordBlitz();
-                }
-            });
+                    } else if (gameType === 'word-blitz') {
+                        this.startWordBlitz();
+                    } else if (gameType === 'word-match') {
+                        this.startWordMatch();
+                    }
+                });
         });
     }
 
@@ -2847,6 +2850,22 @@ class WendyApp {
         await this.wordBlitzGame.start();
     }
 
+    async startWordMatch() {
+        // 如果游戏实例不存在，创建它
+        if (!this.wordMatchGame) {
+            if (typeof WordMatchGame !== 'undefined') {
+                this.wordMatchGame = new WordMatchGame(this.api, this);
+            } else {
+                console.error('WordMatchGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.wordMatchGame.start();
+    }
+
     openGameModal() {
         const modal = document.getElementById('game-modal');
         if (modal) {
@@ -2922,6 +2941,12 @@ class WendyApp {
                 healthLabel: '生命值',
                 correctLabel: '答对',
                 durationLabel: '游戏时长',
+                flipLabel: '翻牌',
+                timeLabel: '时间',
+                matchCountLabel: '配对成功',
+                flipCountLabel: '翻牌次数',
+                perfectLabel: '完美配对',
+                efficiencyLabel: '配对效率',
                 playAgainBtn: '再玩一次',
                 backToDiscoverBtn: '返回发现',
                 // 限时挑战模式选择
@@ -2969,6 +2994,12 @@ class WendyApp {
                 healthLabel: 'Health',
                 correctLabel: 'Correct',
                 durationLabel: 'Duration',
+                flipLabel: 'Flips',
+                timeLabel: 'Time',
+                matchCountLabel: 'Matches',
+                flipCountLabel: 'Flip Count',
+                perfectLabel: 'Perfect',
+                efficiencyLabel: 'Efficiency',
                 playAgainBtn: 'Play Again',
                 backToDiscoverBtn: 'Back to Discover',
                 // 限时挑战模式选择
@@ -3017,6 +3048,12 @@ class WendyApp {
         const healthLabel = document.getElementById('health-label');
         const correctLabel = document.getElementById('correct-label');
         const durationLabel = document.getElementById('duration-label');
+        const flipLabel = document.getElementById('flip-label');
+        const timeLabel = document.getElementById('time-label');
+        const matchCountLabel = document.getElementById('match-count-label');
+        const flipCountLabel = document.getElementById('flip-count-label');
+        const perfectLabel = document.getElementById('perfect-label');
+        const efficiencyLabel = document.getElementById('efficiency-label');
         const playAgainBtn = document.getElementById('play-again-btn');
         const backToDiscoverBtn = document.getElementById('back-to-discover-btn');
         
@@ -3060,6 +3097,12 @@ class WendyApp {
         if (healthLabel && t.healthLabel) healthLabel.textContent = t.healthLabel;
         if (correctLabel && t.correctLabel) correctLabel.textContent = t.correctLabel;
         if (durationLabel && t.durationLabel) durationLabel.textContent = t.durationLabel;
+        if (flipLabel && t.flipLabel) flipLabel.textContent = t.flipLabel;
+        if (timeLabel && t.timeLabel) timeLabel.textContent = t.timeLabel;
+        if (matchCountLabel && t.matchCountLabel) matchCountLabel.textContent = t.matchCountLabel;
+        if (flipCountLabel && t.flipCountLabel) flipCountLabel.textContent = t.flipCountLabel;
+        if (perfectLabel && t.perfectLabel) perfectLabel.textContent = t.perfectLabel;
+        if (efficiencyLabel && t.efficiencyLabel) efficiencyLabel.textContent = t.efficiencyLabel;
         if (playAgainBtn && t.playAgainBtn) playAgainBtn.textContent = t.playAgainBtn;
         if (backToDiscoverBtn && t.backToDiscoverBtn) backToDiscoverBtn.textContent = t.backToDiscoverBtn;
         
