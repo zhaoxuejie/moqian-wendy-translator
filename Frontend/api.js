@@ -186,9 +186,10 @@ class WendyApp {
         this.currentGamePage = 1; // 游戏卡片当前页码
         this.currentGameType = 'word-challenge'; // 当前选中的游戏类型
         this.wordChallengeGame = null; // 单词挑战游戏实例
-        this.currentGamePage = 1; // 游戏卡片当前页码
-        this.currentGameType = 'word-challenge'; // 当前选中的游戏类型
-        this.wordChallengeGame = null; // 单词挑战游戏实例
+        this.timeChallengeGame = null; // 限时挑战游戏实例
+        this.comboRewardsGame = null; // 连击奖励游戏实例
+        this.aiBattleGame = null; // AI对战游戏实例
+        this.wordBlitzGame = null; // 单词速射游戏实例
         
         // 语音名称到简短昵称的映射表
         this.voiceNicknames = {
@@ -2715,26 +2716,39 @@ class WendyApp {
     bindGameCardEvents() {
         const gameCards = document.querySelectorAll('.game-card');
         gameCards.forEach(card => {
-            // 只对可见的卡片绑定事件（避免重复绑定）
-            if (card.style.display !== 'none' && !card.hasAttribute('data-event-bound')) {
-                card.setAttribute('data-event-bound', 'true');
-                card.addEventListener('click', () => {
-                    const gameType = card.getAttribute('data-game');
-                    if (card.classList.contains('disabled')) {
-                        this.showNotification('该游戏即将推出，敬请期待！', 'info');
-                        // 即使游戏未启用，也切换里程碑显示
-                        this.loadGameMilestones(gameType);
-                        return;
-                    }
-                    
-                    // 切换里程碑显示
-                    this.loadGameMilestones(gameType);
-                    
-                    if (gameType === 'word-challenge') {
-                        this.startWordChallenge();
-                    }
-                });
+            // 移除旧的事件监听器（如果存在）
+            if (card.hasAttribute('data-event-bound')) {
+                const newCard = card.cloneNode(true);
+                card.parentNode.replaceChild(newCard, card);
+                card = newCard;
             }
+            
+            // 绑定新的事件监听器
+            card.setAttribute('data-event-bound', 'true');
+            card.addEventListener('click', () => {
+                const gameType = card.getAttribute('data-game');
+                if (card.classList.contains('disabled')) {
+                    this.showNotification('该游戏即将推出，敬请期待！', 'info');
+                    // 即使游戏未启用，也切换里程碑显示
+                    this.loadGameMilestones(gameType);
+                    return;
+                }
+                
+                // 切换里程碑显示
+                this.loadGameMilestones(gameType);
+                
+                if (gameType === 'word-challenge') {
+                    this.startWordChallenge();
+                } else if (gameType === 'time-challenge') {
+                    this.startTimeChallenge();
+                } else if (gameType === 'combo-rewards') {
+                    this.startComboRewards();
+                } else if (gameType === 'ai-battle') {
+                    this.startAIBattle();
+                } else if (gameType === 'word-blitz') {
+                    this.startWordBlitz();
+                }
+            });
         });
     }
 
@@ -2767,6 +2781,70 @@ class WendyApp {
         
         // 启动游戏
         await this.wordChallengeGame.start();
+    }
+
+    async startTimeChallenge() {
+        // 如果游戏实例不存在，创建它
+        if (!this.timeChallengeGame) {
+            if (typeof TimeChallengeGame !== 'undefined') {
+                this.timeChallengeGame = new TimeChallengeGame(this.api, this);
+            } else {
+                console.error('TimeChallengeGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.timeChallengeGame.start();
+    }
+
+    async startComboRewards() {
+        // 如果游戏实例不存在，创建它
+        if (!this.comboRewardsGame) {
+            if (typeof ComboRewardsGame !== 'undefined') {
+                this.comboRewardsGame = new ComboRewardsGame(this.api, this);
+            } else {
+                console.error('ComboRewardsGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.comboRewardsGame.start();
+    }
+
+    async startAIBattle() {
+        // 如果游戏实例不存在，创建它
+        if (!this.aiBattleGame) {
+            if (typeof AIBattleGame !== 'undefined') {
+                this.aiBattleGame = new AIBattleGame(this.api, this);
+            } else {
+                console.error('AIBattleGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.aiBattleGame.start();
+    }
+
+    async startWordBlitz() {
+        // 如果游戏实例不存在，创建它
+        if (!this.wordBlitzGame) {
+            if (typeof WordBlitzGame !== 'undefined') {
+                this.wordBlitzGame = new WordBlitzGame(this.api, this);
+            } else {
+                console.error('WordBlitzGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.wordBlitzGame.start();
     }
 
     openGameModal() {
@@ -2817,23 +2895,94 @@ class WendyApp {
                 scoreLabel: '得分',
                 comboLabel: '连击',
                 progressLabel: '进度',
+                questionsLabel: '答题',
+                timerLabel: '剩余时间',
+                questionHint: '请选择对应的英文单词',
                 finalScoreLabel: '最终得分',
                 correctCountLabel: '答对题数',
                 accuracyLabel: '正确率',
                 maxComboLabel: '最高连击',
+                speedLabel: '题/分钟',
+                wrongLabel: '错误',
+                multiplierLabel: '倍数',
+                bonusLabel: '连击奖励',
+                avgComboLabel: '平均连击',
+                roundLabel: '回合',
+                targetLabel: '目标',
+                playerHealthLabel: '生命值',
+                aiHealthLabel: '生命值',
+                playerScoreLabel: '得分',
+                aiScoreLabel: '得分',
+                playerCorrectLabel: '答对',
+                aiCorrectLabel: '答对',
+                playerComboLabel: '连击',
+                aiComboLabel: '连击',
+                totalRoundsLabel: '总回合数',
+                totalQuestionsLabel: '总答题数',
+                healthLabel: '生命值',
+                correctLabel: '答对',
+                durationLabel: '游戏时长',
                 playAgainBtn: '再玩一次',
-                backToDiscoverBtn: '返回发现'
+                backToDiscoverBtn: '返回发现',
+                // 限时挑战模式选择
+                modeTitle: '选择挑战模式',
+                easyMode: '简单模式',
+                mediumMode: '中等模式',
+                hardMode: '困难模式',
+                timeBonus: '答对+2秒',
+                timeBonusMedium: '答对+1秒',
+                noTimeBonus: '无时间奖励',
+                // 连击奖励模式选择
+                classicMode: '经典模式',
+                challengeMode: '挑战模式',
+                endlessMode: '无限模式'
             },
             en: {
                 scoreLabel: 'Score',
                 comboLabel: 'Combo',
                 progressLabel: 'Progress',
+                questionsLabel: 'Questions',
+                timerLabel: 'Time Remaining',
+                questionHint: 'Choose the correct English word',
                 finalScoreLabel: 'Final Score',
                 correctCountLabel: 'Correct',
                 accuracyLabel: 'Accuracy',
                 maxComboLabel: 'Max Combo',
+                speedLabel: 'Q/Min',
+                wrongLabel: 'Wrong',
+                multiplierLabel: 'Multiplier',
+                bonusLabel: 'Combo Bonus',
+                avgComboLabel: 'Avg Combo',
+                roundLabel: 'Round',
+                targetLabel: 'Target',
+                healthLabel: 'Health',
+                playerHealthLabel: 'Health',
+                aiHealthLabel: 'Health',
+                playerScoreLabel: 'Score',
+                aiScoreLabel: 'Score',
+                playerCorrectLabel: 'Correct',
+                aiCorrectLabel: 'Correct',
+                playerComboLabel: 'Combo',
+                aiComboLabel: 'Combo',
+                totalRoundsLabel: 'Total Rounds',
+                totalQuestionsLabel: 'Total Questions',
+                healthLabel: 'Health',
+                correctLabel: 'Correct',
+                durationLabel: 'Duration',
                 playAgainBtn: 'Play Again',
-                backToDiscoverBtn: 'Back to Discover'
+                backToDiscoverBtn: 'Back to Discover',
+                // 限时挑战模式选择
+                modeTitle: 'Select Challenge Mode',
+                easyMode: 'Easy Mode',
+                mediumMode: 'Medium Mode',
+                hardMode: 'Hard Mode',
+                timeBonus: '+2s per correct',
+                timeBonusMedium: '+1s per correct',
+                noTimeBonus: 'No time bonus',
+                // 连击奖励模式选择
+                classicMode: 'Classic Mode',
+                challengeMode: 'Challenge Mode',
+                endlessMode: 'Endless Mode'
             }
         };
         
@@ -2841,22 +2990,109 @@ class WendyApp {
         const scoreLabel = document.getElementById('score-label');
         const comboLabel = document.getElementById('combo-label');
         const progressLabel = document.getElementById('progress-label');
+        const questionsLabel = document.getElementById('questions-label');
+        const timerLabel = document.getElementById('timer-label');
+        const questionHint = document.getElementById('question-hint');
         const finalScoreLabel = document.getElementById('final-score-label');
         const correctCountLabel = document.getElementById('correct-count-label');
         const accuracyLabel = document.getElementById('accuracy-label');
         const maxComboLabel = document.getElementById('max-combo-label');
+        const speedLabel = document.getElementById('speed-label');
+        const wrongLabel = document.getElementById('wrong-label');
+        const multiplierLabel = document.getElementById('multiplier-label');
+        const bonusLabel = document.getElementById('bonus-label');
+        const avgComboLabel = document.getElementById('avg-combo-label');
+        const roundLabel = document.getElementById('round-label');
+        const targetLabel = document.getElementById('target-label');
+        const playerHealthLabel = document.getElementById('player-health-label');
+        const aiHealthLabel = document.getElementById('ai-health-label');
+        const playerScoreLabel = document.getElementById('player-score-label');
+        const aiScoreLabel = document.getElementById('ai-score-label');
+        const playerCorrectLabel = document.getElementById('player-correct-label');
+        const aiCorrectLabel = document.getElementById('ai-correct-label');
+        const playerComboLabel = document.getElementById('player-combo-label');
+        const aiComboLabel = document.getElementById('ai-combo-label');
+        const totalRoundsLabel = document.getElementById('total-rounds-label');
+        const totalQuestionsLabel = document.getElementById('total-questions-label');
+        const healthLabel = document.getElementById('health-label');
+        const correctLabel = document.getElementById('correct-label');
+        const durationLabel = document.getElementById('duration-label');
         const playAgainBtn = document.getElementById('play-again-btn');
         const backToDiscoverBtn = document.getElementById('back-to-discover-btn');
+        
+        // 模式选择界面
+        const modeTitleZh = document.querySelector('.mode-title-zh');
+        const modeTitleEn = document.querySelector('.mode-title-en');
+        const modeNameZh = document.querySelectorAll('.mode-name-zh');
+        const modeNameEn = document.querySelectorAll('.mode-name-en');
+        const modeTimeZh = document.querySelectorAll('.mode-time-zh');
+        const modeTimeEn = document.querySelectorAll('.mode-time-en');
+        const modeBonusZh = document.querySelectorAll('.mode-bonus-zh');
+        const modeBonusEn = document.querySelectorAll('.mode-bonus-en');
         
         if (scoreLabel && t.scoreLabel) scoreLabel.textContent = t.scoreLabel;
         if (comboLabel && t.comboLabel) comboLabel.textContent = t.comboLabel;
         if (progressLabel && t.progressLabel) progressLabel.textContent = t.progressLabel;
+        if (questionsLabel && t.questionsLabel) questionsLabel.textContent = t.questionsLabel;
+        if (timerLabel && t.timerLabel) timerLabel.textContent = t.timerLabel;
+        if (questionHint && t.questionHint) questionHint.textContent = t.questionHint;
         if (finalScoreLabel && t.finalScoreLabel) finalScoreLabel.textContent = t.finalScoreLabel;
         if (correctCountLabel && t.correctCountLabel) correctCountLabel.textContent = t.correctCountLabel;
         if (accuracyLabel && t.accuracyLabel) accuracyLabel.textContent = t.accuracyLabel;
         if (maxComboLabel && t.maxComboLabel) maxComboLabel.textContent = t.maxComboLabel;
+        if (speedLabel && t.speedLabel) speedLabel.textContent = t.speedLabel;
+        if (wrongLabel && t.wrongLabel) wrongLabel.textContent = t.wrongLabel;
+        if (multiplierLabel && t.multiplierLabel) multiplierLabel.textContent = t.multiplierLabel;
+        if (bonusLabel && t.bonusLabel) bonusLabel.textContent = t.bonusLabel;
+        if (avgComboLabel && t.avgComboLabel) avgComboLabel.textContent = t.avgComboLabel;
+        if (roundLabel && t.roundLabel) roundLabel.textContent = t.roundLabel;
+        if (targetLabel && t.targetLabel) targetLabel.textContent = t.targetLabel;
+        if (playerHealthLabel && t.playerHealthLabel) playerHealthLabel.textContent = t.playerHealthLabel;
+        if (aiHealthLabel && t.aiHealthLabel) aiHealthLabel.textContent = t.aiHealthLabel;
+        if (playerScoreLabel && t.playerScoreLabel) playerScoreLabel.textContent = t.playerScoreLabel;
+        if (aiScoreLabel && t.aiScoreLabel) aiScoreLabel.textContent = t.aiScoreLabel;
+        if (playerCorrectLabel && t.playerCorrectLabel) playerCorrectLabel.textContent = t.playerCorrectLabel;
+        if (aiCorrectLabel && t.aiCorrectLabel) aiCorrectLabel.textContent = t.aiCorrectLabel;
+        if (playerComboLabel && t.playerComboLabel) playerComboLabel.textContent = t.playerComboLabel;
+        if (aiComboLabel && t.aiComboLabel) aiComboLabel.textContent = t.aiComboLabel;
+        if (totalRoundsLabel && t.totalRoundsLabel) totalRoundsLabel.textContent = t.totalRoundsLabel;
+        if (totalQuestionsLabel && t.totalQuestionsLabel) totalQuestionsLabel.textContent = t.totalQuestionsLabel;
+        if (healthLabel && t.healthLabel) healthLabel.textContent = t.healthLabel;
+        if (correctLabel && t.correctLabel) correctLabel.textContent = t.correctLabel;
+        if (durationLabel && t.durationLabel) durationLabel.textContent = t.durationLabel;
         if (playAgainBtn && t.playAgainBtn) playAgainBtn.textContent = t.playAgainBtn;
         if (backToDiscoverBtn && t.backToDiscoverBtn) backToDiscoverBtn.textContent = t.backToDiscoverBtn;
+        
+        // 更新模式选择界面语言
+        if (modeTitleZh && modeTitleEn) {
+            modeTitleZh.style.display = lang === 'zh' ? 'block' : 'none';
+            modeTitleEn.style.display = lang === 'zh' ? 'none' : 'block';
+            if (t.modeTitle) {
+                modeTitleZh.textContent = t.modeTitle;
+                modeTitleEn.textContent = t.modeTitle;
+            }
+        }
+        
+        modeNameZh.forEach((el, index) => {
+            if (el && modeNameEn[index]) {
+                el.style.display = lang === 'zh' ? 'block' : 'none';
+                modeNameEn[index].style.display = lang === 'zh' ? 'none' : 'block';
+            }
+        });
+        
+        modeTimeZh.forEach((el, index) => {
+            if (el && modeTimeEn[index]) {
+                el.style.display = lang === 'zh' ? 'block' : 'none';
+                modeTimeEn[index].style.display = lang === 'zh' ? 'none' : 'block';
+            }
+        });
+        
+        modeBonusZh.forEach((el, index) => {
+            if (el && modeBonusEn[index]) {
+                el.style.display = lang === 'zh' ? 'block' : 'none';
+                modeBonusEn[index].style.display = lang === 'zh' ? 'none' : 'block';
+            }
+        });
     }
 
     switchToTab(tabName) {
