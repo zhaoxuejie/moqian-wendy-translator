@@ -31,25 +31,41 @@ class TranslationService:
         # 当前使用的翻译服务
         self.current_service = "mock"  # mock, baidu, youdao, tencent
         
-    def set_baidu_config(self, appid: str, secret: str):
+    def set_baidu_config(self, appid: str, secret: str, set_as_current: bool = True):
         """设置百度翻译配置"""
         self.baidu_appid = appid
         self.baidu_secret = secret
-        self.current_service = "baidu"
+        if set_as_current:
+            self.current_service = "baidu"
         try:
             print("✅ 已配置百度翻译API")
         except (UnicodeEncodeError, ValueError, OSError):
             print("已配置百度翻译API")
         
-    def set_youdao_config(self, app_key: str, app_secret: str):
+    def set_youdao_config(self, app_key: str, app_secret: str, set_as_current: bool = True):
         """设置有道翻译配置"""
         self.youdao_app_key = app_key
         self.youdao_app_secret = app_secret
-        self.current_service = "youdao"
+        if set_as_current:
+            self.current_service = "youdao"
         try:
             print("✅ 已配置有道翻译API")
         except (UnicodeEncodeError, ValueError, OSError):
             print("已配置有道翻译API")
+    
+    def set_preferred_service(self, service: str):
+        """设置优先使用的翻译服务"""
+        if service == 'baidu' and self.baidu_appid and self.baidu_secret:
+            self.current_service = 'baidu'
+            print(f"✅ 翻译服务已切换为: 百度翻译")
+        elif service == 'youdao' and self.youdao_app_key and self.youdao_app_secret:
+            self.current_service = 'youdao'
+            print(f"✅ 翻译服务已切换为: 有道翻译")
+        elif service == 'mock':
+            self.current_service = 'mock'
+            print(f"✅ 翻译服务已切换为: 模拟翻译")
+        else:
+            print(f"⚠️  无法切换到 {service}，该服务未配置或配置不完整")
         
     def translate(self, text: str, from_lang: str = "auto", to_lang: str = "zh") -> Dict:
         """
@@ -95,6 +111,7 @@ class TranslationService:
             return self._get_fallback_result(text)
         
         # 构建请求参数
+        # 注意：签名必须基于原始文本（未URL编码）生成
         salt = str(random.randint(32768, 65536))
         sign_str = self.baidu_appid + text + salt + self.baidu_secret
         sign = hashlib.md5(sign_str.encode('utf-8')).hexdigest()
@@ -112,9 +129,12 @@ class TranslationService:
             # 打印请求日志
             print(f"🔍 [百度翻译] 请求翻译: '{text}' ({from_lang} -> {to_lang})")
             print(f"   APP ID: {self.baidu_appid[:8]}...")
+            print(f"   随机数: {salt}")
             print(f"   签名: {sign[:16]}...")
             
-            response = requests.get(self.baidu_url, params=params, timeout=5)
+            # 使用POST方法，避免GET请求时URL编码导致的签名问题
+            # 同时支持GET和POST，但POST更可靠
+            response = requests.post(self.baidu_url, data=params, timeout=10)
             result = response.json()
             
             print(f"📥 [百度翻译] 响应状态: {response.status_code}")
@@ -126,6 +146,27 @@ class TranslationService:
                 print(f"❌ [百度翻译] 翻译失败!")
                 print(f"   错误代码: {error_code}")
                 print(f"   错误信息: {error_msg}")
+                
+                # 如果是签名错误，尝试使用GET方法（某些情况下GET可能更兼容）
+                if error_code == '54001':
+                    print(f"🔄 [百度翻译] 尝试使用GET方法重试...")
+                    try:
+                        response = requests.get(self.baidu_url, params=params, timeout=10)
+                        result = response.json()
+                        if 'error_code' not in result:
+                            print(f"✅ [百度翻译] GET方法重试成功!")
+                            translation_result = result['trans_result'][0]['dst']
+                            return {
+                                'translated_text': translation_result,
+                                'pronunciation': '',
+                                'example_sentence': '',
+                                'example_translation': '',
+                                'audio_url': '',
+                                'source': 'baidu'
+                            }
+                    except Exception as e2:
+                        print(f"⚠️  [百度翻译] GET方法重试也失败: {e2}")
+                
                 return self._get_fallback_result(text)
             
             # 解析百度翻译结果

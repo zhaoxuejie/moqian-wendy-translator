@@ -23,6 +23,8 @@ services:
       - BAIDU_SECRET=${BAIDU_SECRET:-}
       - YOUDAO_APPKEY=${YOUDAO_APPKEY:-}
       - YOUDAO_SECRET=${YOUDAO_SECRET:-}
+      # 翻译服务优先级（可选）：youdao 或 baidu，默认优先使用有道
+      - TRANSLATION_SERVICE=${TRANSLATION_SERVICE:-}
       
       # DeepSeek API 配置（可选）
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}

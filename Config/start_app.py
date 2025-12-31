@@ -78,69 +78,35 @@ def init_database():
         return False
 
 def configure_translation_api():
-    """配置翻译API"""
-    print("🔧 配置翻译API...")
+    """检查翻译API配置（配置会在 app.py 启动时自动加载）"""
+    print("🔧 检查翻译API配置...")
+    # 注意：实际的API配置会在 app.py 启动时由 core/config.py 自动加载
+    # 这里只做简单的检查，不进行实际配置
     try:
-        # 切换到Backend/services目录（注意大小写）
+        # 检查是否有环境变量或配置文件
+        has_env = (
+            os.getenv('BAIDU_APPID') or os.getenv('YOUDAO_APPKEY') or
+            os.getenv('BAIDU_TRANSLATE_APPID') or os.getenv('YOUDAO_TRANSLATE_APPKEY')
+        )
+        
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
         services_dir = os.path.join(project_root, "Backend", "services")
         
-        # 检查目录是否存在
-        if not os.path.exists(services_dir):
-            print(f"⚠️ 服务目录不存在: {services_dir}")
-            return True  # 继续启动，使用模拟翻译
+        has_config_file = (
+            os.path.exists(os.path.join(services_dir, "configure_api.py")) or
+            os.path.exists(os.path.join(services_dir, "configure_youdao_api.py"))
+        )
         
-        # 运行API配置脚本，使用UTF-8编码避免GBK解码错误
-        # 注意：Python 3.7+ 支持 encoding 参数
-        try:
-            result = subprocess.run(
-                [sys.executable, "configure_api.py"], 
-                cwd=services_dir, 
-                capture_output=True, 
-                text=True,
-                encoding='utf-8',
-                errors='ignore',
-                timeout=10
-            )
-        except TypeError:
-            # Python 3.6 不支持 encoding 参数，使用环境变量
-            env = os.environ.copy()
-            env['PYTHONIOENCODING'] = 'utf-8'
-            result = subprocess.run(
-                [sys.executable, "configure_api.py"], 
-                cwd=services_dir, 
-                capture_output=True, 
-                text=True,
-                env=env,
-                timeout=10
-            )
-        
-        if result.returncode == 0:
-            print("✅ 翻译API配置成功")
-            if result.stdout:
-                # 安全地显示输出，避免索引错误
-                try:
-                    output = result.stdout[-200:] if len(result.stdout) > 200 else result.stdout
-                    print(output)
-                except:
-                    pass
-            return True
+        if has_env or has_config_file:
+            print("✅ 检测到API配置（将在服务启动时自动加载）")
         else:
-            print("⚠️ 翻译API配置失败，将使用模拟翻译")
-            if result.stderr:
-                # 安全地显示错误，避免索引错误
-                try:
-                    error_output = result.stderr[-200:] if len(result.stderr) > 200 else result.stderr
-                    print(error_output)
-                except:
-                    pass
-            return True  # 配置失败也要继续启动
+            print("ℹ️  未检测到API配置，将使用模拟翻译")
+        
+        return True
     except Exception as e:
-        print(f"⚠️ 翻译API配置异常: {e}")
-        import traceback
-        traceback.print_exc()
-        return True  # 配置失败也要继续启动
+        print(f"⚠️ 检查API配置时出现异常: {e}")
+        return True  # 检查失败也要继续启动
 
 def start_backend():
     """启动后端服务"""
@@ -163,6 +129,7 @@ def start_backend():
         # 等待服务启动
         time.sleep(3)
         print("✅ 后端服务已启动 (http://localhost:5000)")
+        sys.stdout.flush()  # 刷新输出，确保信息立即显示
         return True
     except Exception as e:
         print(f"❌ 后端服务启动失败: {e}")
@@ -182,20 +149,20 @@ def open_browser():
 
 def show_app_info():
     """显示应用信息"""
-    print("\n" + "=" * 50)
+    # 添加多个空行和明显的分隔符，确保信息不被覆盖
+    print("\n\n")
+    print("=" * 70)
     print("🎉 温蒂翻译助手启动成功！")
-    print("=" * 50)
-    print("📱 应用信息:")
+    print("=" * 70)
+    print("\n📱 应用信息:")
     print("   - 前端界面: http://localhost:5000")
     print("   - API接口: http://localhost:5000/api")
     print("   - 数据库: wendy_translator.db")
-    print("")
-    print("👤 用户信息:")
+    print("\n👤 用户信息:")
     print("   - 默认用户: wendy")
     print("   - 默认主题: 粉色")
     print("   - 默认语言: 中文")
-    print("")
-    print("🔧 功能特性:")
+    print("\n🔧 功能特性:")
     print("   - ✅ 英中翻译")
     print("   - ✅ AI对话助手")
     print("   - ✅ 单词本管理（支持分页）")
@@ -203,8 +170,9 @@ def show_app_info():
     print("   - ✅ 个性化设置")
     print("   - ✅ 语音朗读")
     print("   - ✅ 成就系统")
-    print("")
-    print("💡 使用提示:")
+    print("   - ✅ 多种单词学习游戏")
+    print("   - ✅ 游戏音效系统")
+    print("\n💡 使用提示:")
     print("   - 输入英文单词进行翻译")
     print("   - 使用AI对话功能深度学习")
     print("   - 点击麦克风模拟语音输入")
@@ -212,9 +180,13 @@ def show_app_info():
     print("   - 将单词添加到单词本进行学习")
     print("   - 点击星星标记掌握程度")
     print("   - 点击头像更换主题和设置")
-    print("")
-    print("按 Ctrl+C 停止服务")
-    print("=" * 50)
+    print("   - 在发现页体验各种单词学习游戏")
+    print("\n" + "=" * 70)
+    print("⚠️  按 Ctrl+C 停止服务")
+    print("=" * 70)
+    print("\n")
+    # 强制刷新输出缓冲区，确保信息立即显示
+    sys.stdout.flush()
 
 def main():
     """主函数"""
@@ -254,7 +226,12 @@ def main():
             print(f"❌ {step_name}失败，启动终止")
             return False
     
-    # 显示应用信息
+    # 等待 Flask 完全启动并输出初始日志
+    # 这样启动信息会显示在 Flask 日志之后，不会被覆盖
+    print("\n⏳ 等待服务完全启动...")
+    time.sleep(3)  # 给 Flask 足够时间输出初始日志
+    
+    # 显示应用信息（在 Flask 日志之后显示，确保可见）
     show_app_info()
     
     # 保持服务运行
@@ -262,8 +239,11 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n\n👋 服务已停止")
+        print("\n\n" + "=" * 70)
+        print("👋 服务已停止")
         print("感谢使用温蒂翻译助手！")
+        print("=" * 70)
+        sys.stdout.flush()
     
     return True
 
