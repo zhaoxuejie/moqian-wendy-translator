@@ -6,6 +6,7 @@
 import requests
 import hashlib
 import random
+import re
 import time
 import json
 from typing import Dict, Optional, List
@@ -30,6 +31,45 @@ class TranslationService:
         
         # 当前使用的翻译服务
         self.current_service = "mock"  # mock, baidu, youdao, tencent
+
+        # 金山词霸 Next.js buildId 缓存。
+        # 金山用的是 Next.js，词条接口 URL 里带构建ID，每次发版都会变，
+        # 不能写死（写死的值失效后会一直 404）。这里动态获取并缓存。
+        self.iciba_build_id = None
+        self.iciba_build_id_time = 0
+        # buildId 缓存有效期（秒）。过期后重新抓取，避免长期使用陈旧值。
+        self.iciba_build_id_ttl = 3600
+
+    def _fetch_iciba_build_id(self) -> str:
+        """从金山词霸页面抓取当前 Next.js buildId"""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.iciba.com/",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        }
+        try:
+            resp = requests.get("https://www.iciba.com/word?w=hello", headers=headers, timeout=8)
+            if resp.status_code == 200:
+                m = re.search(r'"buildId"\s*:\s*"([^"]+)"', resp.text)
+                if m:
+                    return m.group(1)
+            print(f"   [金山词霸] 抓取 buildId 失败，HTTP {resp.status_code}")
+        except Exception as e:
+            print(f"   [金山词霸] 抓取 buildId 异常: {e}")
+        return ""
+
+    def _get_iciba_build_id(self, force_refresh: bool = False) -> str:
+        """获取 buildId（带缓存）；force_refresh=True 时强制重新抓取"""
+        now = time.time()
+        if (not force_refresh and self.iciba_build_id
+                and now - self.iciba_build_id_time < self.iciba_build_id_ttl):
+            return self.iciba_build_id
+
+        build_id = self._fetch_iciba_build_id()
+        if build_id:
+            self.iciba_build_id = build_id
+            self.iciba_build_id_time = now
+        return build_id
         
     def set_baidu_config(self, appid: str, secret: str, set_as_current: bool = True):
         """设置百度翻译配置"""
@@ -478,7 +518,11 @@ class TranslationService:
     def _get_word_info_from_iciba(self, word: str) -> Dict:
         """
         从金山词霸获取单词信息（音标、例句、发音等）
-        使用金山词霸JSON API: https://www.iciba.com/_next/data/0uoz6g5Mqy_2ryPPl06a0/word.json?w={单词}
+
+        金山使用 Next.js，词条接口为
+        https://www.iciba.com/_next/data/{buildId}/word.json?w={单词}
+        buildId 随金山每次发版变化，因此动态获取（见 _get_iciba_build_id），
+        并在遇到 404（buildId 已失效）时强制刷新后重试一次。
         """
         if not word or len(word.strip()) == 0:
             return {}
@@ -489,18 +533,32 @@ class TranslationService:
             return {}
         
         try:
-            # 金山词霸JSON API
-            url = f"https://www.iciba.com/_next/data/0uoz6g5Mqy_2ryPPl06a0/word.json?w={word_clean}"
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept": "application/json",
                 "Referer": "https://www.iciba.com/",
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
             }
-            
+
+            build_id = self._get_iciba_build_id()
+            if not build_id:
+                print("   [金山词霸] 未能获取 buildId，跳过")
+                return {}
+
+            url = f"https://www.iciba.com/_next/data/{build_id}/word.json?w={word_clean}"
             print(f"   [金山词霸] 请求URL: {url}")
             response = requests.get(url, headers=headers, timeout=5)
             print(f"   [金山词霸] HTTP状态码: {response.status_code}")
+
+            # 404 说明缓存的 buildId 已随金山发版失效，强制重新获取并重试一次
+            if response.status_code == 404:
+                print("   [金山词霸] buildId 已失效，重新获取后重试")
+                build_id = self._get_iciba_build_id(force_refresh=True)
+                if build_id:
+                    url = f"https://www.iciba.com/_next/data/{build_id}/word.json?w={word_clean}"
+                    print(f"   [金山词霸] 重试URL: {url}")
+                    response = requests.get(url, headers=headers, timeout=5)
+                    print(f"   [金山词霸] 重试状态码: {response.status_code}")
             
             if response.status_code == 200:
                 print(f"   [金山词霸] 响应成功，开始解析JSON")

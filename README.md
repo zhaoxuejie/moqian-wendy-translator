@@ -455,7 +455,11 @@ SYSTEM_PROMPT = """你是小语，温蒂的英语学习小伙伴和智能翻译�
 ### 翻译服务架构
 
 #### 金山词霸集成
-- **API地址**: `https://www.iciba.com/_next/data/0uoz6g5Mqy_2ryPPl06a0/word.json?w={word}`
+- **API地址**: `https://www.iciba.com/_next/data/{buildId}/word.json?w={word}`
+  - 金山使用 Next.js，`buildId` 随其每次发版而变化，**不能写死**（写死后接口会一直 404）
+  - 代码会自动从 `https://www.iciba.com/word?w=hello` 页面抓取当前 `buildId`，
+    并在内存中缓存 1 小时；若请求返回 404（说明 buildId 已失效），
+    会强制刷新 `buildId` 并自动重试一次，因此金山发版后无需改代码
 - **数据提取**:
   - 音标：`baesInfo.symbols.ph_am`（美式音标）
   - 音频URL：`baesInfo.symbols.ph_am_mp3`
