@@ -253,6 +253,11 @@ const wendyAPI = new WendyAPI(resolveApiBaseURL());
 // 和「下一个目标：50个单词」的文案自相矛盾。
 const MILESTONE_TARGETS = [50, 100, 200, 300, 500, 800, 1200, 2000];
 
+// 单词本「按教材册次筛选」的本机记忆键。
+// 存 localStorage 而不是服务端 —— 这是"这台设备上次看到哪一册"的界面状态，
+// 手机和电脑各看各的，不该互相影响。
+const WORDBOOK_SOURCE_STORAGE_KEY = 'wendy.wordbookSource';
+
 function nextMilestoneTarget(masteredWords) {
     const count = Number(masteredWords) || 0;
 
@@ -279,7 +284,9 @@ class WendyApp {
         this.selectedVoiceLang = ''; // 用户选择的语音语言
         this.availableVoices = []; // 可用的语音列表
         this.currentAudio = null; // 后端合成时正在播放的 <audio> 元素
-        this.currentWordbookSource = ''; // 单词本当前筛选的教材册次（空 = 全部）
+        // 单词本当前筛选的教材册次（空 = 全部）。
+        // 从本机记忆恢复，否则刷新一下就被弹回「全部单词」了
+        this.currentWordbookSource = this.loadStoredWordbookSource();
         this.wordbookSources = []; // 各来源的统计（在学词数 / 总数），用于筛选下拉
         this.milestoneTarget = 0; // 当前里程碑目标（已掌握多少词），由进度数据算出
         this.achievements = []; // 全部成就（含未达成），进成长页时加载
@@ -404,6 +411,31 @@ class WendyApp {
             .replace(/'/g, '&#39;');
     }
 
+    // ===== 单词本筛选的本机记忆 =====
+    // 记住"上次选了哪一册"，刷新 / 重开 App 后还停在那儿。
+    // localStorage 在隐私模式或被禁用时会抛异常，所以到处都兜住 ——
+    // 存不了顶多是记不住筛选，不该影响单词本本身能不能用。
+
+    loadStoredWordbookSource() {
+        try {
+            return localStorage.getItem(WORDBOOK_SOURCE_STORAGE_KEY) || '';
+        } catch (err) {
+            return '';
+        }
+    }
+
+    saveWordbookSource(source) {
+        try {
+            if (source) {
+                localStorage.setItem(WORDBOOK_SOURCE_STORAGE_KEY, source);
+            } else {
+                localStorage.removeItem(WORDBOOK_SOURCE_STORAGE_KEY);
+            }
+        } catch (err) {
+            // 存不了就算了
+        }
+    }
+
     // 渲染「按来源筛选」下拉。sources 由后端按单词本实际情况计算，
     // 所以只列出真的有词的册次，不会出现空选项。
     renderSourceFilter(sources) {
@@ -442,6 +474,9 @@ class WendyApp {
         if (!stillThere) {
             this.currentWordbookSource = '';
             select.value = '';
+            // 存在本机的那一册已经不存在了，一起清掉，
+            // 否则下次刷新还会拿它去匹配
+            this.saveWordbookSource('');
         } else {
             select.value = current;
         }
@@ -533,6 +568,13 @@ class WendyApp {
 
         try {
             const result = await this.api.importWordlist(pack.id);
+
+            // 导入成功后自动切到刚导入的这一册 ——
+            // 否则筛选要是停在别的册上，新导入的词一个都看不见
+            // （筛选状态现在还会存到本机，不切的话刷新也看不到）
+            this.currentWordbookSource = pack.id;
+            this.saveWordbookSource(pack.id);
+            this.currentPage = 1;
 
             await this.loadWordbook();
 
@@ -637,6 +679,7 @@ class WendyApp {
         if (sourceFilter) {
             sourceFilter.addEventListener('change', () => {
                 this.currentWordbookSource = sourceFilter.value;
+                this.saveWordbookSource(sourceFilter.value);   // 记到本机，刷新后还停在这册
                 this.currentPage = 1; // 换筛选后回到第一页
                 this.loadWordbook();
             });
