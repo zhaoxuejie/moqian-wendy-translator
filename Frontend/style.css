@@ -2459,14 +2459,17 @@ footer {
 
 /* 手机端优化 */
 @media screen and (max-width: 768px) {
+    /* 原来只有 10px 边距，卡片几乎贴边；20px 才读得出"这是一张卡片" */
     .word-detail-modal {
-        padding: 10px;
+        padding: 20px;
     }
 
     .word-detail-content {
-        max-width: 100%;
-        margin: 10px 0;
-        border-radius: 15px;
+        /* 原来写的是 max-width: 100%，宽屏设备上会铺满整个宽度。
+           给个上限，让它始终是卡片而不是通栏 */
+        max-width: 480px;
+        margin: 0;
+        border-radius: 16px;
     }
 
     .word-detail-close {
@@ -2504,17 +2507,28 @@ footer {
     .word-detail-section-title {
         font-size: 15px;
     }
+
+    /* 这两个块是 .word-detail-content 的直接子元素，
+       内边距必须和上面的 section 保持一致，否则左右会错位 */
+    .wordbook-detail-meta {
+        padding: 12px 15px;
+    }
+
+    .wordbook-detail-actions {
+        padding: 0 15px 15px;
+    }
 }
 
 /* 小屏手机优化 */
 @media screen and (max-width: 480px) {
+    /* 原来是 5px —— 430px 屏上卡片宽 420px，占屏 97.7%，看着像整屏抽屉 */
     .word-detail-modal {
-        padding: 5px;
+        padding: 20px 20px 32px;
     }
 
     .word-detail-content {
-        margin: 5px 0;
-        border-radius: 12px;
+        margin: 0;
+        border-radius: 16px;
     }
 
     .word-detail-image-container {
