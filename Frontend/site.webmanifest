@@ -1,0 +1,29 @@
+{
+  "name": "温蒂的翻译助手",
+  "short_name": "温蒂翻译",
+  "description": "专为女儿温蒂设计的英语翻译学习应用",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffdae9",
+  "theme_color": "#ff9ec9",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
