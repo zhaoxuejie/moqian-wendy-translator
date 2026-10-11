@@ -1613,17 +1613,23 @@ class WendyApp {
         console.log('words_this_month:', progress.words_this_month, '类型:', typeof progress.words_this_month);
 
         // 更新里程碑显示
+        //
+        // 口径必须用「已掌握」（mastery_level = 3，也就是成长页统计的那个），
+        // 不能用 progress.total_words —— 那是单词本里的全部单词数。
+        // 导入整册教材之后 total_words 会变成几百上千，
+        // 拿它当"已学会"会显示成"已学会 886 个单词"，明显不对。
+        const masteredWords = Number(progress.total_mastered_words) || 0;
+        const milestoneTarget = 50;
+
         const milestoneText = document.getElementById('milestone-text');
         if (milestoneText) {
-            const totalWords = progress.total_words || 0;
-            milestoneText.innerHTML = `已学会 <strong>${totalWords}</strong> 个单词，继续加油！`;
+            milestoneText.innerHTML = `已学会 <strong>${masteredWords}</strong> 个单词，继续加油！`;
         }
 
-        // 更新进度条
+        // 进度条与里程碑同一个口径，否则数字和进度会对不上
         const progressBar = document.querySelector('.progress');
         if (progressBar) {
-            const totalWords = progress.total_words || 0;
-            const progressPercent = Math.min((totalWords / 50) * 100, 100);
+            const progressPercent = Math.min((masteredWords / milestoneTarget) * 100, 100);
             progressBar.style.width = `${progressPercent}%`;
         }
 
