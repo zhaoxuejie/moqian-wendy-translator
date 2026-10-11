@@ -51,14 +51,33 @@ from services.speech_service import speech_service
 from services.ocr_service import ocr_service
 from core.config import translation_config
 
-app = Flask(__name__, static_folder='../../frontend', static_url_path='')
+# ===== 目录解析 =====
+# 仓库中的目录是 Frontend/、Backend/、Config/（首字母大写），
+# 而 Docker 镜像里通过 COPY 的目标路径变成了 /app/frontend、/app/backend、/app/config（小写）。
+# Linux 文件系统区分大小写，必须按实际存在的名字解析，否则会加载不到前端文件。
+def _resolve_dir(base_dir, name):
+    """在 base_dir 下以不区分大小写的方式定位 name 对应的实际目录"""
+    direct = os.path.join(base_dir, name)
+    if os.path.isdir(direct):
+        return direct
+    try:
+        for entry in os.listdir(base_dir):
+            if entry.lower() == name.lower() and os.path.isdir(os.path.join(base_dir, entry)):
+                return os.path.join(base_dir, entry)
+    except OSError:
+        pass
+    return direct
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+FRONTEND_DIR = _resolve_dir(BASE_DIR, 'frontend')
+DATABASE_DIR = _resolve_dir(BASE_DIR, 'database')
+
+app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')
 CORS(app)  # 允许跨域请求
 
 # 配置
-import os
-# 数据库路径：优先使用环境变量，否则使用默认路径
-DATABASE = os.getenv('DATABASE_PATH', 
-    os.path.join(os.path.dirname(__file__), '../../database/wendy_translator.db'))
+# 数据库路径：优先使用环境变量，否则使用默认路径（绝对路径，不依赖当前工作目录）
+DATABASE = os.getenv('DATABASE_PATH', os.path.join(DATABASE_DIR, 'wendy_translator.db'))
 SECRET_KEY = 'wendy-translator-secret-key-2024'
 
 # 导入DeepSeek服务
@@ -142,26 +161,21 @@ def handle_errors(f):
 @app.route('/')
 def index():
     """返回主页"""
-    return send_from_directory('../../frontend', 'index.html')
+    return send_from_directory(FRONTEND_DIR, 'index.html')
 
 @app.route('/<path:filename>')
 def static_files(filename):
     """提供静态文件服务"""
-    # 首先尝试从frontend目录提供文件
-    frontend_path = f'../../frontend/{filename}'
+    # 首先尝试从 frontend 目录提供文件（绝对路径，不依赖当前工作目录）
+    frontend_path = os.path.join(FRONTEND_DIR, filename)
     if os.path.exists(frontend_path):
-        return send_from_directory('../../frontend', filename)
-    
-    # 然后尝试从项目根目录提供文件（用于测试文件）
-    root_path = f'../../{filename}'
+        return send_from_directory(FRONTEND_DIR, filename)
+
+    # 然后尝试从项目根目录提供文件
+    root_path = os.path.join(BASE_DIR, filename)
     if os.path.exists(root_path):
-        return send_from_directory('../..', filename)
-    
-    # 最后尝试从backend目录提供文件
-    backend_path = f'../../{filename}'
-    if os.path.exists(backend_path):
-        return send_from_directory('../..', filename)
-    
+        return send_from_directory(BASE_DIR, filename)
+
     return f'File not found: {filename}', 404
 
 # ====== 健康检查 API ======
@@ -1144,7 +1158,7 @@ if __name__ == '__main__':
     
     # 检查数据库
     if not os.path.exists(DATABASE):
-        print("❌ 数据库不存在，请先运行 python backend/scripts/database_init.py")
+        print("❌ 数据库不存在，请先运行 python Backend/scripts/database_init.py")
         exit(1)
     
     # 确保word_details表存在
@@ -1179,7 +1193,7 @@ if __name__ == '__main__':
         conn.close()
     except Exception as e:
         print(f"⚠️  检查word_details表时出错: {e}")
-        print("   建议运行 python backend/scripts/database_init.py 来初始化数据库")
+        print("   建议运行 python Backend/scripts/database_init.py 来初始化数据库")
     
     print(f"📁 工作目录: {os.getcwd()}")
     print(f"💾 数据库: {DATABASE}")
@@ -1187,4 +1201,9 @@ if __name__ == '__main__':
     print("=" * 40)
     
     # 启动Flask应用
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    # 调试模式默认开启（方便本地开发）；容器部署时通过 FLASK_DEBUG=false 关闭，
+    # 避免 Werkzeug 调试器在生产环境暴露（调试器可执行任意代码）。
+    DEBUG_MODE = os.getenv('FLASK_DEBUG', 'true').strip().lower() in ('1', 'true', 'yes', 'on')
+    if DEBUG_MODE:
+        print("⚠️  调试模式已开启（生产环境请设置 FLASK_DEBUG=false）")
+    app.run(debug=DEBUG_MODE, host='0.0.0.0', port=5000, use_reloader=False)

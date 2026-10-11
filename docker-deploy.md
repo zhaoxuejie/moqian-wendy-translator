@@ -13,6 +13,10 @@ cp .env.example .env
 # 编辑 .env 文件，填入你的 API 密钥
 ```
 
+`docker compose` 会自动读取项目根目录的 `.env` 并注入容器。
+**密钥不需要写进 `docker-compose.yml`，也不会被打进镜像**
+（`.dockerignore` 已排除 `.env`）。
+
 ### 2. 创建数据目录
 ```bash
 mkdir -p database
@@ -20,8 +24,11 @@ mkdir -p database
 
 ### 3. 构建并启动
 ```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
+
+> 构建时 apt 与 pip 均默认使用阿里云镜像源。
+> 海外网络可用 `docker-compose build --build-arg PIP_INDEX_URL=https://pypi.org/simple/` 覆盖 pip 源。
 
 ### 4. 查看日志
 ```bash
@@ -113,7 +120,10 @@ docker stats wendy-translator
 
 - `BAIDU_APPID` / `BAIDU_SECRET`: 百度翻译 API
 - `YOUDAO_APPKEY` / `YOUDAO_SECRET`: 有道翻译 API
+- `TRANSLATION_SERVICE`: 翻译优先级，`youdao`（默认）或 `baidu`
 - `DEEPSEEK_API_KEY`: DeepSeek AI API
 - `BAIDU_SPEECH_*`: 百度语音识别 API
 - `BAIDU_OCR_*`: 百度 OCR API
+- `FLASK_DEBUG`: 是否开启 Flask 调试模式，容器中默认为 `false`。
+  调试模式会启用 Werkzeug 交互式调试器，**生产环境务必保持关闭**。
 

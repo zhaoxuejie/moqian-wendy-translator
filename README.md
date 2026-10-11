@@ -186,6 +186,35 @@ python Backend/core/app.py
 
 浏览器打开 http://localhost:5000
 
+## 🐳 Docker 部署（可选）
+
+除本地运行外，项目也支持容器化部署。
+
+```bash
+# 1. 配置密钥（Docker Compose 会自动读取根目录的 .env）
+cp .env.example .env        # Windows: copy .env.example .env
+
+# 2. 构建并启动
+docker compose up -d --build
+
+# 3. 查看状态与日志
+docker compose ps
+docker compose logs -f
+
+# 4. 停止
+docker compose down
+```
+
+- 访问地址同样是 http://localhost:5000
+- 数据库持久化在 `./database/` 目录，删除容器不会丢数据
+- 容器内以 `FLASK_DEBUG=false` 运行（调试模式默认关闭，避免 Werkzeug 调试器暴露）
+- 容器内目录为小写（`/app/backend`、`/app/frontend`、`/app/config`），
+  应用通过不区分大小写的方式解析路径，因此仓库中的大小写写法在容器里同样可用
+- 构建时 pip 默认使用阿里云镜像源；海外网络可覆盖：
+  `docker compose build --build-arg PIP_INDEX_URL=https://pypi.org/simple/`
+
+更详细的说明见 [docker-deploy.md](docker-deploy.md)。
+
 ## 📱 使用指南
 
 ### 基础翻译

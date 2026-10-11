@@ -9,6 +9,8 @@ if ! command -v python &> /dev/null; then
     exit 1
 fi
 
-# 切换到config目录运行启动脚本
-cd config
+# 切换到 Config 目录运行启动脚本
+# 注意：仓库里的目录名是 Config（首字母大写），Linux/Mac 区分大小写
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/Config" || { echo "❌ 未找到 Config 目录"; exit 1; }
 python start_app.py

@@ -23,7 +23,14 @@ RUN apt-get update && apt-get install -y \
 COPY Config/requirements.txt /app/requirements.txt
 
 # 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 使用国内镜像源加速（apt 已用阿里云，pip 同理）。
+# 海外网络可用 --build-arg PIP_INDEX_URL=https://pypi.org/simple/ 覆盖。
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+RUN pip install --no-cache-dir \
+    -i ${PIP_INDEX_URL} \
+    --timeout 120 \
+    --retries 5 \
+    -r requirements.txt
 
 # 复制项目文件（源路径必须与仓库中的实际大小写一致）
 COPY Backend/ /app/backend/

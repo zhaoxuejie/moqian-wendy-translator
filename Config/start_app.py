@@ -70,7 +70,7 @@ def init_database():
     """初始化数据库"""
     print("💾 初始化数据库...")
     try:
-        subprocess.check_call([sys.executable, "backend/scripts/database_init.py"])
+        subprocess.check_call([sys.executable, "Backend/scripts/database_init.py"])
         print("✅ 数据库初始化完成")
         return True
     except subprocess.CalledProcessError as e:
@@ -91,7 +91,7 @@ def configure_translation_api():
         
         script_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(script_dir)
-        services_dir = os.path.join(project_root, "backend", "services")
+        services_dir = os.path.join(project_root, "Backend", "services")
         
         has_config_file = (
             os.path.exists(os.path.join(services_dir, "configure_api.py")) or
@@ -118,7 +118,7 @@ def start_backend():
             env = os.environ.copy()
             env['PYTHONUNBUFFERED'] = '1'
             subprocess.call(
-                [sys.executable, "-u", "backend/core/app.py"],
+                [sys.executable, "-u", "Backend/core/app.py"],
                 env=env
             )
         
@@ -200,10 +200,10 @@ def main():
     
     # 检查必要文件
     required_files = [
-        'backend/core/app.py', 
-        'backend/scripts/database_init.py', 
-        'frontend/index.html', 
-        'frontend/api.js'
+        'Backend/core/app.py', 
+        'Backend/scripts/database_init.py', 
+        'Frontend/index.html', 
+        'Frontend/api.js'
     ]
     missing_files = [f for f in required_files if not os.path.exists(f)]
     if missing_files:

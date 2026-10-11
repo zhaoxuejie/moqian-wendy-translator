@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   wendy-translator:
     build:
@@ -17,6 +15,8 @@ services:
       # Flask 配置
       - FLASK_ENV=production
       - FLASK_APP=backend/core/app.py
+      # 关闭调试模式，避免 Werkzeug 调试器在生产环境暴露
+      - FLASK_DEBUG=false
       # 数据库路径
       - DATABASE_PATH=/app/database/wendy_translator.db
       
