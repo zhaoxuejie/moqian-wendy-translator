@@ -418,7 +418,9 @@
                 resultTitle: "翻译结果(举例)",
                 addToWordbook: "添加到单词本",
                 milestoneTitle: "学习里程碑",
-                nextTargetText: "下一个目标：50个单词",
+                // {n} 会替换成当前里程碑目标（50 → 100 → 200 …），
+                // 换行/文案随意改，数字由 updateProgressDisplay 填
+                nextTargetText: "下一个目标：{n}个单词",
                 progressTitle: "成长记录",
                 discoverTitle: "单词小游戏",
                 discoverSubtitle: "通过游戏轻松记忆单词",
@@ -466,7 +468,7 @@
                 resultTitle: "Translation Result",
                 addToWordbook: "Add to Wordbook",
                 milestoneTitle: "Learning Milestone",
-                nextTargetText: "Next goal: 50 words",
+                nextTargetText: "Next goal: {n} words",
                 progressTitle: "Progress Record",
                 discoverTitle: "Word Games",
                 discoverSubtitle: "Learn words through fun games",
@@ -525,7 +527,18 @@
             document.getElementById('result-title').textContent = t.resultTitle;
             document.getElementById('add-to-wordbook-btn').setAttribute('title', t.addToWordbook);
             document.getElementById('milestone-title').textContent = t.milestoneTitle;
-            document.getElementById('next-target-text').textContent = t.nextTargetText;
+
+            // 「下一个目标」的文案里含 {n} 占位符，把模板存到 data-template，
+            // 交给 wendyApp.updateNextTargetText() 按当前目标数渲染。
+            // 它还没初始化时先填默认档位兜底，避免显示成字面的 {n}。
+            const nextTargetEl = document.getElementById('next-target-text');
+            nextTargetEl.setAttribute('data-template', t.nextTargetText);
+            if (typeof wendyApp !== 'undefined' && wendyApp && wendyApp.updateNextTargetText) {
+                wendyApp.updateNextTargetText();
+            } else {
+                nextTargetEl.textContent = t.nextTargetText.replace('{n}', 50);
+            }
+
             document.getElementById('progress-title').textContent = t.progressTitle;
             document.getElementById('footer-text').textContent = t.footerText;
             document.getElementById('congratulation-title').textContent = t.congratulationTitle;

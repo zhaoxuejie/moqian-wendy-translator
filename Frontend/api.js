@@ -243,6 +243,30 @@ function resolveApiBaseURL() {
 // 创建全局API实例
 const wendyAPI = new WendyAPI(resolveApiBaseURL());
 
+// 里程碑目标档位：已掌握数超过当前目标就自动升到下一档。
+//
+// 为什么要做档位而不是「当前数 + 50」：档位是 50 / 100 / 200 这种
+// 整数里程碑，孩子更容易有"到站"的感觉；而"当前数 + 50"会一直变，
+// 进度条永远走不到头。
+//
+// 之前这里写死 50，掌握超过 50 个之后进度条一直满格，
+// 和「下一个目标：50个单词」的文案自相矛盾。
+const MILESTONE_TARGETS = [50, 100, 200, 300, 500, 800, 1200, 2000];
+
+function nextMilestoneTarget(masteredWords) {
+    const count = Number(masteredWords) || 0;
+
+    for (let i = 0; i < MILESTONE_TARGETS.length; i++) {
+        if (count < MILESTONE_TARGETS[i]) {
+            return MILESTONE_TARGETS[i];
+        }
+    }
+
+    // 超过最大档位后，按最大档位的整数倍继续往上
+    const step = MILESTONE_TARGETS[MILESTONE_TARGETS.length - 1];
+    return Math.ceil((count + 1) / step) * step;
+}
+
 // 前端应用管理器
 class WendyApp {
     constructor() {
@@ -257,6 +281,7 @@ class WendyApp {
         this.currentAudio = null; // 后端合成时正在播放的 <audio> 元素
         this.currentWordbookSource = ''; // 单词本当前筛选的教材册次（空 = 全部）
         this.wordbookSources = []; // 各来源的统计（在学词数 / 总数），用于筛选下拉
+        this.milestoneTarget = 0; // 当前里程碑目标（已掌握多少词），由进度数据算出
         // 后端语音合成的发音人（百度基础版）。
         // 浏览器没有系统 TTS 引擎时，用这些填充「语音设置」面板，
         // 否则面板只会显示「暂无中文语音」，用户根本没得选。
@@ -1664,7 +1689,11 @@ class WendyApp {
         // 导入整册教材之后 total_words 会变成几百上千，
         // 拿它当"已学会"会显示成"已学会 886 个单词"，明显不对。
         const masteredWords = Number(progress.total_mastered_words) || 0;
-        const milestoneTarget = 50;
+
+        // 目标按已掌握数自动升档（50 → 100 → 200 …），
+        // 这样进度条不会在满格之后一直卡住
+        const milestoneTarget = nextMilestoneTarget(masteredWords);
+        this.milestoneTarget = milestoneTarget;
 
         const milestoneText = document.getElementById('milestone-text');
         if (milestoneText) {
@@ -1677,6 +1706,8 @@ class WendyApp {
             const progressPercent = Math.min((masteredWords / milestoneTarget) * 100, 100);
             progressBar.style.width = `${progressPercent}%`;
         }
+
+        this.updateNextTargetText();
 
         // 更新成长记录
         const streakText = document.getElementById('streak-text');
@@ -1734,6 +1765,18 @@ class WendyApp {
         } else {
             console.error('未找到 total-mastered-text 元素');
         }
+    }
+
+    // 渲染「下一个目标：N个单词」这句。
+    // 目标是动态的，所以文案模板（含 {n} 占位符）由 updateLanguage 写进
+    // data-template，这里只负责把 {n} 换成当前目标数。
+    updateNextTargetText() {
+        const el = document.getElementById('next-target-text');
+        if (!el) return;
+
+        const template = el.getAttribute('data-template') || '下一个目标：{n}个单词';
+        const target = this.milestoneTarget || MILESTONE_TARGETS[0];
+        el.textContent = template.replace('{n}', target);
     }
 
     // 应用用户设置
