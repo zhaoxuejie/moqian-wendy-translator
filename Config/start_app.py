@@ -8,10 +8,11 @@
 import os
 import sys
 import io
+import socket
 import subprocess
+import urllib.request
 import webbrowser
 import time
-import threading
 from pathlib import Path
 
 # 设置输出编码为UTF-8（Windows控制台支持）
@@ -108,32 +109,96 @@ def configure_translation_api():
         print(f"⚠️ 检查API配置时出现异常: {e}")
         return True  # 检查失败也要继续启动
 
-def start_backend():
-    """启动后端服务"""
-    print("🚀 启动后端服务...")
+# 用于探测本地健康检查接口。显式禁用代理，避免系统代理（如 127.0.0.1:7890）
+# 把本机请求劫持走导致误判。
+_PROBE_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def probe_health(url="http://127.0.0.1:5000/api/health", timeout=1.5):
+    """请求健康检查接口；能正常返回 200 才说明后端真的起来了"""
     try:
-        # 在新线程中启动Flask应用
-        def run_flask():
-            # 使用 -u 参数禁用输出缓冲，确保日志实时显示
-            env = os.environ.copy()
-            env['PYTHONUNBUFFERED'] = '1'
-            subprocess.call(
-                [sys.executable, "-u", "Backend/core/app.py"],
-                env=env
-            )
-        
-        flask_thread = threading.Thread(target=run_flask)
-        flask_thread.daemon = True
-        flask_thread.start()
-        
-        # 等待服务启动
-        time.sleep(3)
-        print("✅ 后端服务已启动 (http://localhost:5000)")
-        sys.stdout.flush()  # 刷新输出，确保信息立即显示
-        return True
-    except Exception as e:
-        print(f"❌ 后端服务启动失败: {e}")
+        with _PROBE_OPENER.open(url, timeout=timeout) as resp:
+            return resp.status == 200
+    except Exception:
         return False
+
+
+def port_in_use(host="127.0.0.1", port=5000):
+    """检测端口上是否已经有程序在监听"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1.0)
+    try:
+        return s.connect_ex((host, port)) == 0
+    except Exception:
+        return False
+    finally:
+        s.close()
+
+
+def format_exit_code(code):
+    """把退出码转成可读文本（Windows 下被强制结束会返回 0xFFFFFFFF）"""
+    if code is None:
+        return "退出码未知"
+    if code in (4294967295, -1):
+        return "被强制结束"
+    return f"退出码 {code}"
+
+
+def start_backend():
+    """启动后端服务，并确认它真的起来了
+
+    Returns:
+        成功 -> subprocess.Popen 对象（供主循环监测）
+        失败 -> None
+    """
+    print("🚀 启动后端服务...")
+
+    # 端口预检：Windows 下两个进程可以同时绑定同一端口，
+    # 若此处已有服务（例如 Docker 容器），健康检查会被对方应答，
+    # 出现「看起来启动成功、实际访问到别的服务」的假象，因此直接终止。
+    if port_in_use():
+        print("❌ 端口 5000 已被其它程序占用，无法启动。")
+        print("   Windows 允许两个进程同时绑定同一端口，届时访问到哪个服务是不确定的，")
+        print("   且健康检查可能被对方应答，导致误判为启动成功。")
+        print("   常见占用方：")
+        print("     - Docker 容器：执行 docker compose down 停止")
+        print("     - 上一次未正常退出的实例：在任务管理器中结束对应的 python 进程")
+        print("   请先释放端口后重试。")
+        return None
+
+    env = os.environ.copy()
+    env['PYTHONUNBUFFERED'] = '1'  # 禁用输出缓冲，确保日志实时显示
+
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-u", "Backend/core/app.py"],
+            env=env
+        )
+    except Exception as e:
+        print(f"❌ 无法启动后端进程: {e}")
+        return None
+
+    # 等待后端就绪。同时监测进程状态：
+    # 后端一旦崩溃就立刻报错返回，绝不再无条件宣布「启动成功」。
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        exit_code = proc.poll()
+        if exit_code is not None:
+            print(f"❌ 后端服务启动失败：进程已退出（{format_exit_code(exit_code)}）")
+            print("   常见原因：端口 5000 被占用、依赖缺失、Python 版本不匹配。")
+            print("   请查看上方日志中的具体报错。")
+            return None
+
+        if probe_health():
+            print("✅ 后端服务已启动 (http://localhost:5000)")
+            sys.stdout.flush()  # 刷新输出，确保信息立即显示
+            return proc
+
+        time.sleep(0.5)
+
+    print("❌ 后端服务启动超时：30 秒内未通过 /api/health 健康检查")
+    proc.terminate()
+    return None
 
 def open_browser():
     """打开浏览器"""
@@ -210,14 +275,12 @@ def main():
         print(f"❌ 缺少必要文件: {', '.join(missing_files)}")
         return False
     
-    # 执行初始化步骤
+    # 执行初始化步骤（这些步骤返回 True/False）
     steps = [
         ("检查Python版本", check_python_version),
         ("安装依赖包", install_dependencies),
         ("初始化数据库", init_database),
         ("配置翻译API", configure_translation_api),
-        ("启动后端服务", start_backend),
-        ("打开浏览器", open_browser)
     ]
     
     for step_name, step_func in steps:
@@ -226,21 +289,41 @@ def main():
             print(f"❌ {step_name}失败，启动终止")
             return False
     
-    # 等待 Flask 完全启动并输出初始日志
-    # 这样启动信息会显示在 Flask 日志之后，不会被覆盖
-    print("\n⏳ 等待服务完全启动...")
-    time.sleep(3)  # 给 Flask 足够时间输出初始日志
+    # 启动后端服务，并等它真正通过健康检查
+    print("\n🔄 启动后端服务...")
+    backend_proc = start_backend()
+    if backend_proc is None:
+        print("❌ 启动终止")
+        return False
+    
+    # 后端确认就绪后，再打开浏览器
+    print("\n🔄 打开浏览器...")
+    open_browser()
     
     # 显示应用信息（在 Flask 日志之后显示，确保可见）
     show_app_info()
     
-    # 保持服务运行
+    # 保持服务运行，并持续监测后端是否意外退出
     try:
         while True:
+            if backend_proc.poll() is not None:
+                print("\n" + "=" * 70)
+                print(f"❌ 后端服务已意外退出（{format_exit_code(backend_proc.returncode)}）")
+                print("   前端页面将无法访问，请查看上方日志排查原因。")
+                print("=" * 70)
+                sys.stdout.flush()
+                return False
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n\n" + "=" * 70)
-        print("👋 服务已停止")
+        print("👋 正在停止服务...")
+        # 一并结束后端子进程，避免留下占着端口的孤儿进程
+        if backend_proc.poll() is None:
+            backend_proc.terminate()
+            try:
+                backend_proc.wait(timeout=5)
+            except Exception:
+                backend_proc.kill()
         print("感谢使用温蒂翻译助手！")
         print("=" * 70)
         sys.stdout.flush()
