@@ -41,6 +41,9 @@ services:
       # 百度 OCR API（可选）
       - BAIDU_OCR_API_KEY=${BAIDU_OCR_API_KEY:-}
       - BAIDU_OCR_SECRET_KEY=${BAIDU_OCR_SECRET_KEY:-}
+
+      # Pixabay 图片 API（可选，单词配图 / 记忆图片功能）
+      - PIXABAY_API_KEY=${PIXABAY_API_KEY:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]

@@ -124,6 +124,8 @@ docker stats wendy-translator
 - `DEEPSEEK_API_KEY`: DeepSeek AI API
 - `BAIDU_SPEECH_*`: 百度语音识别 API
 - `BAIDU_OCR_*`: 百度 OCR API
+- `PIXABAY_API_KEY`: Pixabay 图片 API，用于单词配图 / 记忆图片功能
+  （点击翻译结果区的苹果图标触发）。Pixabay **必须带 key**，留空则该功能不可用。
 - `FLASK_DEBUG`: 是否开启 Flask 调试模式，容器中默认为 `false`。
   调试模式会启用 Werkzeug 交互式调试器，**生产环境务必保持关闭**。
 - `TZ`: 容器时区，默认 `Asia/Shanghai`。

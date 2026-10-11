@@ -144,6 +144,7 @@ cp .env.example .env
 | `DEEPSEEK_API_KEY` | AI 对话助手「小语」 | [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) |
 | `BAIDU_SPEECH_APP_ID` / `BAIDU_SPEECH_API_KEY` / `BAIDU_SPEECH_SECRET_KEY` | 百度语音识别 | [百度智能云控制台](https://console.bce.baidu.com/ai/) |
 | `BAIDU_OCR_API_KEY` / `BAIDU_OCR_SECRET_KEY` | 百度 OCR 文字识别 | 同上，可与语音识别共用 |
+| `PIXABAY_API_KEY` | 单词配图 / 记忆图片（点击苹果图标触发） | [Pixabay API](https://pixabay.com/api/docs/) |
 
 > 💡 **只填你需要的即可。** 某项留空时对应功能会自动降级：翻译回落到模拟翻译、AI 对话不可用，不影响其他功能的正常使用。
 >

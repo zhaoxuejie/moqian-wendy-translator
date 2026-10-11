@@ -997,7 +997,8 @@ def get_word_image():
         # 转换为整数，确保在合理范围内
         try:
             per_page = int(per_page)
-            per_page = max(1, min(per_page, 20))  # 限制在1-20之间
+            # Pixabay 的 per_page 合法区间是 3-200，低于 3 会被直接拒绝（HTTP 400）
+            per_page = max(3, min(per_page, 20))
         except (ValueError, TypeError):
             per_page = 3
         

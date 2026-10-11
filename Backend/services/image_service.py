@@ -1,8 +1,13 @@
 """
 图片服务模块
 使用Pixabay API获取单词相关图片
+
+注意：Pixabay API **必须** 携带 key（官方并不存在"免 key"用法）。
+密钥统一放在项目根目录的 .env 中，字段名 PIXABAY_API_KEY；
+申请地址：https://pixabay.com/api/docs/
 """
 
+import os
 import requests
 from typing import Dict, Optional, List
 
@@ -10,14 +15,16 @@ class ImageService:
     """图片服务类"""
     
     def __init__(self):
-        # Pixabay API配置
-        # 注意：Pixabay API可以不用key，但建议申请key以获得更高限额
-        # 免费额度：5000次/小时（无key），更高额度需要key
-        self.api_key = "53961882-70cea595a55e0219583084276"  # 可选，申请后填入
+        # Pixabay API 配置：密钥来自环境变量（项目根目录 .env），不再硬编码
+        self.api_key = (os.getenv('PIXABAY_API_KEY') or '').strip()
         self.base_url = "https://pixabay.com/api/"
+        if self.api_key:
+            print("✅ Pixabay 图片API已配置（从环境变量）")
+        else:
+            print("ℹ️  未配置 Pixabay API Key（PIXABAY_API_KEY），单词配图功能将不可用")
         
     def set_api_key(self, api_key: str):
-        """设置Pixabay API Key（可选）"""
+        """设置Pixabay API Key"""
         self.api_key = api_key
         print("✅ 已配置Pixabay API Key")
     
@@ -49,17 +56,24 @@ class ImageService:
                 'error': '关键词为空或无效',
                 'keyword': keyword
             }
+
+        # Pixabay 必须带 key，未配置时直接给出明确提示，不去发无效请求
+        if not self.api_key:
+            print("⚠️  [图片服务] 未配置 PIXABAY_API_KEY，已跳过")
+            return {
+                'success': False,
+                'error': '未配置 Pixabay API Key，请在项目根目录的 .env 中设置 PIXABAY_API_KEY',
+                'keyword': keyword
+            }
         
         print(f"\n{'='*60}")
         print(f"🖼️  [图片服务] 搜索图片: '{keyword}' (语言: {lang})")
         print(f"{'='*60}")
         
         try:
-            # 构建请求参数
-            # 注意：Pixabay API需要key，但可以使用demo key进行测试
-            # 建议申请自己的API key：https://pixabay.com/api/docs/
+            # 构建请求参数（key 已在前方校验非空）
             params = {
-                'key': self.api_key if self.api_key else '9656065-a4094594c34c9ac8c7df4e39b',  # demo key，建议替换
+                'key': self.api_key,
                 'q': keyword,
                 'image_type': 'photo',  # photo, illustration, vector
                 'orientation': 'horizontal',  # horizontal, vertical, all
