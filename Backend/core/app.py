@@ -401,13 +401,47 @@ SOURCE_FILTER_MANUAL = '__none__'
 @app.route('/api/wordbook', methods=['GET'])
 @handle_errors
 def get_wordbook():
-    """获取单词本，可用 ?source= 按教材册次筛选"""
+    """
+    获取单词本。
+
+    可选参数：
+      source     - 按教材册次筛选；传 __none__ 表示只看手动添加的词
+      stats_only - 只返回各来源的统计、不返回单词列表
+                   （前端点星星学成后刷新筛选下拉用，几百字节）
+    """
     username = request.args.get('username', 'wendy')
     source = (request.args.get('source') or '').strip()
+    stats_only = (request.args.get('stats_only') or '').strip().lower() in ('1', 'true', 'yes')
     
     user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
     if not user:
         return jsonify({'success': False, 'error': '用户不存在'}), 404
+    
+    # 来源统计：count 用 mastery_level < 3 的数 ——
+    # 必须和单词本列表显示的一致（3 星的词已经移到成长页的「我的单词」了）。
+    # 早期版本统计的是该来源的全部词数，导致下拉显示「手动添加（14）」
+    # 但点进去只有 3 个，看着像丢词。
+    source_rows = query_db('''
+        SELECT source,
+               SUM(CASE WHEN mastery_level < 3 THEN 1 ELSE 0 END) AS active,
+               COUNT(*) AS total
+        FROM wordbook
+        WHERE user_id = ?
+        GROUP BY source
+        ORDER BY source
+    ''', (user['id'],)) or []
+    
+    sources = [
+        {
+            'source': row['source'] or '',
+            'count': row['active'] or 0,   # 在学的词数（前端下拉显示这个）
+            'total': row['total'] or 0     # 该来源的全部词数（含已掌握，供提示用）
+        }
+        for row in source_rows
+    ]
+    
+    if stats_only:
+        return jsonify({'success': True, 'sources': sources, 'total': 0, 'words': []})
     
     sql = 'SELECT * FROM wordbook WHERE user_id = ?'
     params = [user['id']]
@@ -440,20 +474,6 @@ def get_wordbook():
             'uk_speech': word['uk_speech'] or '',
             'us_speech': word['us_speech'] or ''
         })
-    
-    # 返回当前单词本里已有的来源清单及各自词数，供前端渲染筛选下拉。
-    # 不改动上面的筛选结果，所以即使正在按册筛选也能拿到完整清单。
-    source_rows = query_db('''
-        SELECT source, COUNT(*) AS cnt
-        FROM wordbook
-        WHERE user_id = ?
-        GROUP BY source
-        ORDER BY source
-    ''', (user['id'],)) or []
-    sources = [
-        {'source': row['source'] or '', 'count': row['cnt']}
-        for row in source_rows
-    ]
     
     return jsonify({
         'success': True,

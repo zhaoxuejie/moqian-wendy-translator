@@ -74,6 +74,12 @@ class WendyAPI {
         return await this.request(url);
     }
 
+    // 只取各来源的统计，不返回单词列表（几百字节）。
+    // 用于点星星学成后刷新筛选下拉里的词数。
+    async getWordbookStats() {
+        return await this.request(`/api/wordbook?username=${this.username}&stats_only=1`);
+    }
+
     // ====== 教材词书 ======
     // 列出 data/wordlists/ 里可导入的教材词书（含每册词数与已导入数）
     async getWordlists() {
@@ -250,6 +256,7 @@ class WendyApp {
         this.availableVoices = []; // 可用的语音列表
         this.currentAudio = null; // 后端合成时正在播放的 <audio> 元素
         this.currentWordbookSource = ''; // 单词本当前筛选的教材册次（空 = 全部）
+        this.wordbookSources = []; // 各来源的统计（在学词数 / 总数），用于筛选下拉
         // 后端语音合成的发音人（百度基础版）。
         // 浏览器没有系统 TTS 引擎时，用这些填充「语音设置」面板，
         // 否则面板只会显示「暂无中文语音」，用户根本没得选。
@@ -340,13 +347,17 @@ class WendyApp {
         }
     }
 
-    // 加载单词本（可按教材册次筛选）
+    // 加载单词本。
+    // 注意：**始终拉全量**，来源筛选放在本地做 ——
+    // 因为成长页的「我的单词」要看到所有已掌握的词，
+    // 不能只看到当前筛选那一册的。
     async loadWordbook() {
         try {
-            const response = await this.api.getWordbook(this.currentWordbookSource || '');
+            const response = await this.api.getWordbook();
             if (response.success) {
                 this.wordDatabase = response.words;
-                this.renderSourceFilter(response.sources);
+                this.wordbookSources = response.sources || [];
+                this.renderSourceFilter(this.wordbookSources);
                 this.renderWordbook();
                 console.log(`加载了 ${response.total} 个单词`);
             }
@@ -927,8 +938,17 @@ class WendyApp {
         const wordbookContainer = document.getElementById('wordbook-container');
         if (!wordbookContainer) return;
 
-        // 过滤已掌握的单词（3星）
-        const activeWords = this.wordDatabase.filter(word => word.mastery_level < 3);
+        // 两步过滤：
+        //   1. 已掌握（3 星）的词不在这里显示 —— 它们去成长页的「我的单词」
+        //   2. 按「来源」筛选。本地过滤，因为 wordDatabase 现在是全量
+        //      （见 loadWordbook 的说明）
+        const source = this.currentWordbookSource || '';
+        const activeWords = this.wordDatabase.filter((word) => {
+            if (word.mastery_level >= 3) return false;
+            if (!source) return true;
+            if (source === '__none__') return !word.source;
+            return word.source === source;
+        });
         
         // 分页设置
         const wordsPerPage = 9;
@@ -1558,8 +1578,12 @@ class WendyApp {
                 // 更新本地数据
                 const word = this.wordDatabase.find(w => w.id === wordId);
                 if (word) {
+                    // 判断这次改动是否让词在「在学 / 已掌握」之间移动了
+                    const wasActive = word.mastery_level < 3;
+                    const nowActive = masteryLevel < 3;
+
                     word.mastery_level = masteryLevel;
-                    // 更新星星显示
+
                     // 只更新星星区。选择器必须限定 .stars ——
                     // 卡片里有多个元素带 data-word-id（删除按钮、星星区），
                     // 用裸的 [data-word-id=...] 会抓到文档顺序第一个（删除按钮），
@@ -1567,6 +1591,12 @@ class WendyApp {
                     const starsContainer = document.querySelector(`.stars[data-word-id="${wordId}"]`);
                     if (starsContainer) {
                         starsContainer.innerHTML = this.getStarsHTML(masteryLevel);
+                    }
+
+                    // 跨过 3 星边界时，筛选下拉里的「在学的词数」变了，
+                    // 要刷新一下，否则下拉会一直显示旧数字
+                    if (wasActive !== nowActive) {
+                        this.refreshWordbookStats();
                     }
                 }
 
@@ -1581,6 +1611,21 @@ class WendyApp {
             }
         } catch (error) {
             this.showNotification('更新失败: ' + error.message, 'error');
+        }
+    }
+
+    // 只刷新各来源的统计（不重新拉单词列表，几百字节）
+    // 用在点星星跨过 3 星边界之后 —— 那时「在学的词数」变了，筛选下拉要更新
+    async refreshWordbookStats() {
+        try {
+            const data = await this.api.getWordbookStats();
+            if (data && data.success) {
+                this.wordbookSources = data.sources || [];
+                this.renderSourceFilter(this.wordbookSources);
+            }
+        } catch (err) {
+            // 只是刷新个数字，失败不该打扰用户
+            console.warn('刷新筛选统计失败:', err);
         }
     }
 
