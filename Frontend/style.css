@@ -2455,70 +2455,69 @@ body.modal-open {
     font-weight: 600;
 }
 
-/* 同义词和反义词（带释义） */
+/* 同义词和反义词（带释义）
+   横向排布的胶囊：一个词一颗，放不下才换行。
+   早期是"一行一个的整宽卡片"，4 个词就把弹窗撑高 220 多像素，
+   又占地方又不好看。 */
 .word-detail-synonyms,
 .word-detail-antonyms {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .synonym-item,
 .antonym-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     background-color: var(--light);
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 14px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.synonym-tag,
+.antonym-tag {
+    flex: 0 0 auto;
+    padding: 3px 10px;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.25s ease, color 0.25s ease;
+    white-space: nowrap;
+}
+
+.synonym-meaning,
+.antonym-meaning {
+    min-width: 0;
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .synonym-tag {
     background-color: var(--secondary);
     color: var(--primary);
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
 }
 
 .synonym-tag:hover {
     background-color: var(--primary);
     color: white;
-    transform: translateY(-2px);
-}
-
-.synonym-meaning {
-    color: #666;
-    font-size: 13px;
-    flex: 1;
 }
 
 .antonym-tag {
     background-color: #ffe5e5;
     color: #d32f2f;
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
 }
 
 .antonym-tag:hover {
     background-color: #d32f2f;
     color: white;
-    transform: translateY(-2px);
-}
-
-.antonym-meaning {
-    color: #666;
-    font-size: 13px;
-    flex: 1;
 }
 
 /* 记忆图片 */
@@ -2767,23 +2766,24 @@ body.modal-open {
         padding: 6px 10px;
     }
 
-    .synonym-tag,
-    .antonym-tag {
-        font-size: 12px;
-        padding: 5px 10px;
-    }
-
+    /* 同义词/反义词在手机上保持横向胶囊，只是再小一号。
+       早期这里写的是 flex-direction: column —— 手机上变成一行一个，
+       比桌面端还占地方。 */
     .synonym-item,
     .antonym-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
+        padding: 3px 8px 3px 3px;
+        gap: 5px;
+    }
+
+    .synonym-tag,
+    .antonym-tag {
+        font-size: 11px;
+        padding: 3px 8px;
     }
 
     .synonym-meaning,
     .antonym-meaning {
-        font-size: 12px;
-        width: 100%;
+        font-size: 11px;
     }
 
     .memory-image {
