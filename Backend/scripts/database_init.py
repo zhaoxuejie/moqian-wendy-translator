@@ -16,6 +16,55 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
+# 游戏回流相关表的建表语句
+# init_database（全新库）与 ensure_game_tables（老库补表）共用，避免建表语句写两遍。
+#
+# game_word_stats：记录每个单词在游戏里的对错与连对次数，支撑
+#   1) 错词回炉（答错的词下次优先出现）
+#   2) 自适应出题（优先练掌握程度低的词）
+#   3) 游戏自动升星（连对达标时给单词本 +1 星）
+# game_progress：游戏进度存档（大冒险的地图/关卡星级等），让手机和电脑进度一致。
+GAME_TABLES_SQL = [
+    """
+    CREATE TABLE IF NOT EXISTS game_word_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        english_word VARCHAR(100) NOT NULL,
+        correct_count INTEGER DEFAULT 0,
+        wrong_count INTEGER DEFAULT 0,
+        streak INTEGER DEFAULT 0,
+        best_streak INTEGER DEFAULT 0,
+        last_result INTEGER DEFAULT 0,
+        last_seen TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        UNIQUE(user_id, english_word)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_game_word_stats_user
+    ON game_word_stats(user_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS game_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game_type VARCHAR(50) NOT NULL,
+        progress_key VARCHAR(100) NOT NULL,
+        value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        UNIQUE(user_id, game_type, progress_key)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_game_progress_user
+    ON game_progress(user_id, game_type)
+    """
+]
+
+
 def init_database(quiet=False):
     """初始化数据库"""
     # 数据库文件路径：优先使用环境变量，否则使用默认路径
@@ -187,6 +236,10 @@ def init_database(quiet=False):
         columns = [column[1] for column in cursor.fetchall()]
         if 'memory_image_keyword' not in columns:
             cursor.execute("ALTER TABLE word_details ADD COLUMN memory_image_keyword VARCHAR(200)")
+        
+        # 创建游戏回流相关表（错词回炉 / 自适应出题 / 自动升星 / 跨设备进度）
+        for sql in GAME_TABLES_SQL:
+            cursor.execute(sql)
         
         # 插入默认用户（温蒂）
         cursor.execute("""
@@ -377,6 +430,34 @@ def ensure_word_details_table(quiet=False):
     finally:
         conn.close()
 
+def ensure_game_tables(quiet=False):
+    """确保游戏回流相关表存在（用于已经建好的老数据库）"""
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
+    
+    if not os.path.exists(db_path):
+        return False
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        for sql in GAME_TABLES_SQL:
+            cursor.execute(sql)
+        conn.commit()
+        if not quiet:
+            print("✅ 游戏回流数据表已就绪（game_word_stats / game_progress）")
+        return True
+    except Exception as e:
+        print(f"❌ 创建游戏回流数据表失败: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
 if __name__ == "__main__":
     quiet_mode = os.getenv('DATABASE_INIT_QUIET', 'false').lower() == 'true'
     
@@ -401,6 +482,9 @@ if __name__ == "__main__":
         check_database(quiet=quiet_mode)
         # 确保word_details表存在
         ensure_word_details_table(quiet=quiet_mode)
+    
+    # 确保游戏回流数据表存在（全新库和老库都走一遍，幂等）
+    ensure_game_tables(quiet=quiet_mode)
     
     if not quiet_mode:
         print("=" * 40)

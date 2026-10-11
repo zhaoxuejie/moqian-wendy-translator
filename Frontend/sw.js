@@ -23,7 +23,7 @@
  *          旧的缓存会在 activate 阶段被自动清掉。
  */
 
-const SW_VERSION = 'v3';
+const SW_VERSION = 'v6';
 const SHELL_CACHE = `wendy-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `wendy-runtime-${SW_VERSION}`;
 const API_CACHE = `wendy-api-${SW_VERSION}`;
@@ -45,6 +45,8 @@ const SHELL_ASSETS = [
     './img/duola.jpg',
     './img/kenan.jpg',
     './img/xiaowanzi.jpg',
+    './games/game-kit.css',
+    './games/game-kit.js',
     './games/word-challenge/word-challenge.css',
     './games/word-challenge/word-challenge.js',
     './games/time-challenge/time-challenge.css',
@@ -56,7 +58,13 @@ const SHELL_ASSETS = [
     './games/word-blitz/word-blitz.css',
     './games/word-blitz/word-blitz.js',
     './games/word-match/word-match.css',
-    './games/word-match/word-match.js'
+    './games/word-match/word-match.js',
+    './games/word-hunter/word-hunter.css',
+    './games/word-hunter/word-hunter.js',
+    './games/lexipuzzle/lexipuzzle.css',
+    './games/lexipuzzle/lexipuzzle.js',
+    './games/adventure/adventure.css',
+    './games/adventure/adventure.js'
 ];
 
 // ==================== 安装 ====================

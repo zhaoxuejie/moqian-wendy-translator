@@ -156,6 +156,32 @@ class WendyAPI {
         });
     }
 
+    // 逐词游戏结果：服务端累计对错次数、连对次数，并在连对达标时自动升星
+    async getGameWordStats(username = 'wendy') {
+        return await this.request(`/api/games/word-stats?username=${encodeURIComponent(username)}`);
+    }
+
+    async saveGameWordStats(payload) {
+        return await this.request('/api/games/word-stats', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
+    // 游戏进度存档（手机与电脑共用同一份）
+    async getGameProgress(username = 'wendy', gameType = null) {
+        let url = `/api/games/progress?username=${encodeURIComponent(username)}`;
+        if (gameType) url += `&game_type=${encodeURIComponent(gameType)}`;
+        return await this.request(url);
+    }
+
+    async saveGameProgress(payload) {
+        return await this.request('/api/games/progress', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
     // ====== 单词详情服务 ======
     async getWordDetail(word) {
         return await this.request(`/api/word/detail?word=${encodeURIComponent(word)}`);
@@ -1026,6 +1052,11 @@ class WendyApp {
         const targetLang = lang || (hasChinese ? 'zh' : 'en');
         const base = (this.api && this.api.baseURL) || wendyAPI.baseURL;
 
+        // 每次朗读领一个号。合成要走网络，可能比"下一条朗读"更晚返回：
+        // 没有这个号，上一题的音频会在新题出现后才播出来，
+        // 表现就是"听到的单词和屏幕上的对不上"（手机上尤其明显）。
+        const token = this.speakToken = (this.speakToken || 0) + 1;
+
         this.stopSpeaking();
 
         const response = await fetch(`${base}/api/speech/tts`, {
@@ -1039,6 +1070,9 @@ class WendyApp {
             })
         });
 
+        // 请求期间又发起了新的朗读 → 这一次的结果直接丢掉，不要放出来
+        if (token !== this.speakToken) return;
+
         if (!response.ok) {
             let message = `HTTP ${response.status}`;
             try {
@@ -1049,9 +1083,18 @@ class WendyApp {
         }
 
         const blob = await response.blob();
+        if (token !== this.speakToken) return;   // 同上：过期的音频不放
+
         const objectUrl = URL.createObjectURL(blob);
         const audio = new Audio(objectUrl);
         audio.volume = this.currentVolume();
+
+        // 播放前再确认一次：期间若有新朗读，直接作废（并释放对象URL）
+        if (token !== this.speakToken) {
+            URL.revokeObjectURL(objectUrl);
+            return;
+        }
+        this.stopSpeaking();
         this.currentAudio = audio;
 
         const cleanup = () => {
@@ -1072,6 +1115,8 @@ class WendyApp {
         // 1) 浏览器自带合成：优先（不耗额度、延迟低、能离线）
         if (this.nativeTTSAvailable()) {
             try {
+                // 同样领个号：让还在路上的后端合成请求作废，避免它稍后突然放出上一句
+                this.speakToken = (this.speakToken || 0) + 1;
                 this.stopSpeaking();
                 speechSynthesis.speak(this.createUtterance(content, { rate: rate, lang: lang }));
                 return;
@@ -3030,6 +3075,12 @@ class WendyApp {
                         this.startWordBlitz();
                     } else if (gameType === 'word-match') {
                         this.startWordMatch();
+                    } else if (gameType === 'word-hunter') {
+                        this.startWordHunter();
+                    } else if (gameType === 'lexipuzzle') {
+                        this.startLexiPuzzle();
+                    } else if (gameType === 'adventure') {
+                        this.startWordAdventure();
                     }
                 });
         });
@@ -3144,6 +3195,54 @@ class WendyApp {
         
         // 启动游戏
         await this.wordMatchGame.start();
+    }
+
+    async startWordHunter() {
+        // 如果游戏实例不存在，创建它
+        if (!this.wordHunterGame) {
+            if (typeof WordHunterGame !== 'undefined') {
+                this.wordHunterGame = new WordHunterGame(this.api, this);
+            } else {
+                console.error('WordHunterGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.wordHunterGame.start();
+    }
+
+    async startLexiPuzzle() {
+        // 如果游戏实例不存在，创建它
+        if (!this.lexiPuzzleGame) {
+            if (typeof LexiPuzzleGame !== 'undefined') {
+                this.lexiPuzzleGame = new LexiPuzzleGame(this.api, this);
+            } else {
+                console.error('LexiPuzzleGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.lexiPuzzleGame.start();
+    }
+
+    async startWordAdventure() {
+        // 如果游戏实例不存在，创建它
+        if (!this.wordAdventureGame) {
+            if (typeof WordAdventureGame !== 'undefined') {
+                this.wordAdventureGame = new WordAdventureGame(this.api, this);
+            } else {
+                console.error('WordAdventureGame类未加载');
+                this.showNotification('游戏加载失败，请刷新页面重试', 'error');
+                return;
+            }
+        }
+        
+        // 启动游戏
+        await this.wordAdventureGame.start();
     }
 
     openGameModal() {

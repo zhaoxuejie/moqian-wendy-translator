@@ -1,0 +1,295 @@
+/* 🏹 单词猎人 游戏样式 */
+
+.word-hunter-game {
+    width: 100%;
+}
+
+/* 顶部信息栏：标题单独一行，三个数据格子平均分列。
+ * 为什么不用默认的「标题 + 数据同一行」：弹窗右上角固定着关闭按钮（× ，
+ * 距右边 20px、宽 40px），窄屏上会把最右边那格「剩余时间」压住。
+ * 所以这里给右侧留出 44px 安全区，并把数据格子做成等宽三列。 */
+.word-hunter-game .game-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-right: 44px;
+    margin-bottom: 14px;
+}
+
+.word-hunter-game .game-title {
+    font-size: 22px;
+}
+
+.word-hunter-game .game-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+
+.word-hunter-game .game-stat-item {
+    min-width: 0;
+    padding: 8px 10px;
+}
+
+.word-hunter-game .game-stat-value {
+    font-size: 20px;
+}
+
+.word-hunter-game .game-progress-bar {
+    margin-bottom: 16px;
+}
+
+/* ==================== 题目提示区 ==================== */
+.hunter-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 76px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    background: var(--light);
+    border-radius: 18px;
+    text-align: center;
+    flex-wrap: wrap;
+}
+
+.hunter-prompt-text {
+    font-size: 16px;
+    color: #666;
+}
+
+.hunter-prompt-meaning {
+    display: block;
+    width: 100%;
+    font-size: 30px;
+    font-weight: bold;
+    color: var(--primary);
+    line-height: 1.2;
+}
+
+.hunter-speaker-btn {
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s ease;
+    flex: 0 0 auto;
+}
+
+.hunter-speaker-btn:active {
+    transform: scale(0.92);
+}
+
+/* ==================== 猎场 ==================== */
+.hunter-arena {
+    position: relative;
+    width: 100%;
+    height: min(56vh, 420px);
+    min-height: 280px;
+    overflow: hidden;
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 45%),
+        linear-gradient(180deg, #e3f7ff 0%, #dff5e1 55%, #ffeccf 100%);
+    border: 3px solid var(--secondary);
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.hunter-target {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 8px 16px;
+    max-width: 46%;
+    background: #fff;
+    border: 2px solid var(--secondary);
+    border-radius: 999px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    will-change: transform;
+    text-align: center;
+}
+
+.hunter-target-word {
+    display: block;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text, #333);
+    word-break: break-word;
+    line-height: 1.25;
+}
+
+/* 打错的目标：变灰、不能再点 */
+.hunter-target.hunter-dead {
+    opacity: 0.35;
+    pointer-events: none;
+    filter: grayscale(1);
+}
+
+/* 打错后高亮正确目标，引导她自己补答 */
+.hunter-target.hunter-answer-glow {
+    background: #fff8e1;
+    border-color: #ffb300;
+    animation: hunterGlow 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes hunterGlow {
+    from { box-shadow: 0 0 0 0 rgba(255, 179, 0, 0.65); }
+    to { box-shadow: 0 0 0 14px rgba(255, 179, 0, 0); }
+}
+
+/* 打中：缩放淡出 */
+.hunter-target.hunter-hit {
+    pointer-events: none;
+}
+
+.hunter-target.hunter-hit .hunter-target-word {
+    animation: hunterHit 0.5s ease forwards;
+}
+
+@keyframes hunterHit {
+    0% { transform: scale(1); color: #2e7d32; }
+    45% { transform: scale(1.35); color: #43a047; }
+    100% { transform: scale(0.6); opacity: 0; }
+}
+
+.hunter-target.hunter-shake .hunter-target-word {
+    animation: hunterShake 0.4s ease;
+}
+
+@keyframes hunterShake {
+    0%, 100% { transform: translateX(0); color: #c62828; }
+    25% { transform: translateX(-7px); }
+    50% { transform: translateX(7px); }
+    75% { transform: translateX(-4px); }
+}
+
+/* ==================== 特效 ==================== */
+.hunter-particle {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: hunterBurst 0.65s ease-out forwards;
+}
+
+@keyframes hunterBurst {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+
+.hunter-float {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    font-weight: bold;
+    color: #ff8f00;
+    pointer-events: none;
+    text-shadow: 0 2px 6px rgba(255, 255, 255, 0.9);
+    animation: hunterFloat 0.9s ease-out forwards;
+}
+
+@keyframes hunterFloat {
+    0% { opacity: 0; margin-top: 0; }
+    25% { opacity: 1; }
+    100% { opacity: 0; margin-top: -46px; }
+}
+
+/* ==================== 狂暴时刻 ==================== */
+.hunter-rage .hunter-arena {
+    box-shadow: inset 0 0 50px rgba(255, 152, 0, 0.55);
+    border-color: #ffa000;
+}
+
+.hunter-rage-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffb300, #ff7043);
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 6px 18px rgba(255, 112, 67, 0.45);
+    animation: hunterRagePulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hunterRagePulse {
+    from { transform: translateX(-50%) scale(1); }
+    to { transform: translateX(-50%) scale(1.08); }
+}
+
+/* ==================== 提示条 ==================== */
+.hunter-hint {
+    min-height: 26px;
+    margin-top: 12px;
+    text-align: center;
+    font-size: 15px;
+    color: #d84315;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.hunter-hint.hunter-hint-show {
+    opacity: 1;
+}
+
+.hunter-hint strong {
+    font-size: 19px;
+    color: #bf360c;
+}
+
+/* 剩余时间条变红 */
+.game-progress-fill.hunter-time-low {
+    background: linear-gradient(90deg, #ff5252, #ff8a65);
+}
+
+/* ==================== 响应式 ==================== */
+@media screen and (max-width: 768px) {
+    .hunter-arena {
+        height: min(52vh, 360px);
+    }
+
+    .hunter-prompt {
+        min-height: 66px;
+        padding: 10px 12px;
+    }
+
+    .hunter-prompt-text {
+        font-size: 14px;
+    }
+
+    .hunter-prompt-meaning {
+        font-size: 24px;
+    }
+
+    .hunter-speaker-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 19px;
+    }
+
+    .hunter-target {
+        padding: 7px 13px;
+        max-width: 44%;
+    }
+
+    .hunter-target-word {
+        font-size: 16px;
+    }
+}

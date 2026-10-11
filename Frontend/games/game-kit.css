@@ -1,0 +1,67 @@
+/* 共享内核界面样式（三款新游戏共用的结算面板部分）
+ * 注意：.result-stats / .result-btn / .result-title 等早已在
+ * word-challenge.css 等文件里全局定义好，这里只补内核独有的部分。
+ */
+
+.kit-result {
+    width: 100%;
+}
+
+.kit-result-wrong {
+    margin: 0 0 28px 0;
+    padding: 18px;
+    background: var(--light);
+    border-radius: 15px;
+    text-align: center;
+}
+
+.kit-result-wrong-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ff7043;
+    margin-bottom: 12px;
+}
+
+.kit-result-wrong-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.kit-wrong-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    background: #fff;
+    border: 2px solid #ffab91;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #d84315;
+}
+
+/* 结算里的「升级喜报」条 */
+.kit-upgrade-banner {
+    margin: 0 0 24px 0;
+    padding: 14px 18px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #fff3c4, #ffe0b2);
+    color: #e65100;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+    animation: kitUpgradePop 0.6s ease;
+}
+
+@keyframes kitUpgradePop {
+    0% { transform: scale(0.85); opacity: 0; }
+    60% { transform: scale(1.04); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@media screen and (max-width: 768px) {
+    .kit-wrong-chip {
+        font-size: 14px;
+        padding: 5px 12px;
+    }
+}

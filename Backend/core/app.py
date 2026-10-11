@@ -1233,6 +1233,265 @@ def save_game_record():
             'error': f'服务异常: {str(e)}'
         }), 500
 
+# ====== 游戏背记回流 API ======
+# 游戏里每答一个词就回传一次结果，服务端负责三件事：
+#   1) 累计对错次数与连对次数 —— 错词回炉、自适应出题的数据来源
+#   2) 连续答对达到阈值时给单词本自动 +1 星（上限 3 星）
+#   3) 返回升星结果，让前端弹祝贺动画
+MASTERY_STREAK_TARGET = 3          # 连续答对多少次自动升 1 星
+MAX_WORD_RESULTS_PER_REPORT = 200  # 一次上报最多处理的单词条数
+MAX_PROGRESS_VALUE_LENGTH = 20000  # 单条进度存档的最大长度（字符）
+
+
+@app.route('/api/games/word-stats', methods=['POST'])
+@handle_errors
+def save_game_word_stats():
+    """保存游戏里的逐词对错结果，并在连对达标时自动升星"""
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'wendy')
+    game_type = (data.get('game_type') or '').strip() or 'unknown'
+    results = data.get('results') or []
+    
+    if not isinstance(results, list) or not results:
+        return jsonify({'success': False, 'error': 'results 不能为空'}), 400
+    
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+    
+    user_id = user['id']
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    upgraded = []
+    word_feedback = []
+    
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        for item in results[:MAX_WORD_RESULTS_PER_REPORT]:
+            if not isinstance(item, dict):
+                continue
+            word = str(item.get('word') or '').strip()[:100]
+            if not word:
+                continue
+            correct = bool(item.get('correct'))
+            
+            cursor.execute('''
+                INSERT OR IGNORE INTO game_word_stats
+                (user_id, english_word, correct_count, wrong_count, streak, best_streak,
+                 last_result, last_seen, created_at, updated_at)
+                VALUES (?, ?, 0, 0, 0, 0, 0, ?, ?, ?)
+            ''', (user_id, word, now_str, now_str, now_str))
+            
+            if correct:
+                cursor.execute('''
+                    UPDATE game_word_stats
+                    SET correct_count = correct_count + 1,
+                        streak = streak + 1,
+                        best_streak = MAX(best_streak, streak + 1),
+                        last_result = 1,
+                        last_seen = ?,
+                        updated_at = ?
+                    WHERE user_id = ? AND english_word = ?
+                ''', (now_str, now_str, user_id, word))
+            else:
+                cursor.execute('''
+                    UPDATE game_word_stats
+                    SET wrong_count = wrong_count + 1,
+                        streak = 0,
+                        last_result = 0,
+                        last_seen = ?,
+                        updated_at = ?
+                    WHERE user_id = ? AND english_word = ?
+                ''', (now_str, now_str, user_id, word))
+            
+            row = cursor.execute('''
+                SELECT streak, correct_count, wrong_count
+                FROM game_word_stats
+                WHERE user_id = ? AND english_word = ?
+            ''', (user_id, word)).fetchone()
+            streak = row['streak'] if row else 0
+            correct_count = row['correct_count'] if row else 0
+            wrong_count = row['wrong_count'] if row else 0
+            
+            # 单词本里有这个词，且连对达标 → 自动升 1 星
+            if correct and streak >= MASTERY_STREAK_TARGET:
+                wb = cursor.execute('''
+                    SELECT id, mastery_level FROM wordbook
+                    WHERE user_id = ? AND english_word = ?
+                ''', (user_id, word)).fetchone()
+                if wb and (wb['mastery_level'] or 0) < 3:
+                    new_level = (wb['mastery_level'] or 0) + 1
+                    cursor.execute('''
+                        UPDATE wordbook
+                        SET mastery_level = ?, review_count = review_count + 1,
+                            last_reviewed = ?, updated_at = ?
+                        WHERE id = ?
+                    ''', (new_level, now_str, now_str, wb['id']))
+                    # 升星后连对计数清零：下一次升星要再连对 3 次
+                    cursor.execute('''
+                        UPDATE game_word_stats SET streak = 0, updated_at = ?
+                        WHERE user_id = ? AND english_word = ?
+                    ''', (now_str, user_id, word))
+                    streak = 0
+                    upgraded.append({
+                        'id': wb['id'],
+                        'english_word': word,
+                        'mastery_level': new_level,
+                        'mastered': new_level >= 3
+                    })
+                elif wb:
+                    # 已经是 3 星：只留复习痕迹，不再升星
+                    cursor.execute('''
+                        UPDATE wordbook
+                        SET review_count = review_count + 1,
+                            last_reviewed = ?, updated_at = ?
+                        WHERE id = ?
+                    ''', (now_str, now_str, wb['id']))
+            
+            word_feedback.append({
+                'word': word,
+                'correct': correct,
+                'streak': streak,
+                'correct_count': correct_count,
+                'wrong_count': wrong_count
+            })
+        
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+    
+    # 升到 3 星的单词补发成就，与手动点星的行为保持一致
+    for item in upgraded:
+        if item['mastered']:
+            check_achievement(user_id, 'master_word', '单词掌握', '成功掌握一个单词！', '⭐')
+    
+    print(f"🎮 游戏单词结果已记录: {game_type}, {len(word_feedback)} 词, 自动升星 {len(upgraded)} 个")
+    return jsonify({
+        'success': True,
+        'game_type': game_type,
+        'processed': len(word_feedback),
+        'upgraded': upgraded,
+        'words': word_feedback
+    })
+
+
+@app.route('/api/games/word-stats', methods=['GET'])
+@handle_errors
+def get_game_word_stats():
+    """获取当前用户所有单词的游戏表现（供游戏做自适应出题、错词回炉）"""
+    username = request.args.get('username', 'wendy')
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+    
+    rows = query_db('''
+        SELECT english_word, correct_count, wrong_count, streak, best_streak,
+               last_result, last_seen
+        FROM game_word_stats
+        WHERE user_id = ?
+    ''', (user['id'],))
+    
+    stats = {}
+    for row in (rows or []):
+        stats[row['english_word']] = {
+            'correct': row['correct_count'] or 0,
+            'wrong': row['wrong_count'] or 0,
+            'streak': row['streak'] or 0,
+            'best_streak': row['best_streak'] or 0,
+            'last_result': row['last_result'] or 0,
+            'last_seen': row['last_seen']
+        }
+    
+    return jsonify({'success': True, 'stats': stats, 'total': len(stats)})
+
+
+@app.route('/api/games/progress', methods=['GET'])
+@handle_errors
+def get_game_progress():
+    """读取游戏进度存档（手机与电脑共用同一份）"""
+    username = request.args.get('username', 'wendy')
+    game_type = (request.args.get('game_type') or '').strip()
+    
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+    
+    if game_type:
+        rows = query_db('''
+            SELECT progress_key, value FROM game_progress
+            WHERE user_id = ? AND game_type = ?
+        ''', (user['id'], game_type))
+    else:
+        rows = query_db('''
+            SELECT game_type, progress_key, value FROM game_progress
+            WHERE user_id = ?
+        ''', (user['id'],))
+    
+    progress = {}
+    for row in (rows or []):
+        if game_type:
+            key = row['progress_key']
+        else:
+            key = f"{row['game_type']}::{row['progress_key']}"
+        try:
+            progress[key] = json.loads(row['value']) if row['value'] is not None else None
+        except (TypeError, ValueError):
+            progress[key] = row['value']
+    
+    return jsonify({'success': True, 'game_type': game_type, 'progress': progress})
+
+
+@app.route('/api/games/progress', methods=['POST'])
+@handle_errors
+def save_game_progress():
+    """写入游戏进度存档，items 为 {key: value}，可一次写多条"""
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'wendy')
+    game_type = (data.get('game_type') or '').strip()
+    items = data.get('items')
+    
+    if not game_type:
+        return jsonify({'success': False, 'error': 'game_type 不能为空'}), 400
+    if not isinstance(items, dict) or not items:
+        return jsonify({'success': False, 'error': 'items 不能为空'}), 400
+    
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+    
+    user_id = user['id']
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    saved = 0
+    
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        for key, value in list(items.items())[:200]:
+            key = str(key).strip()[:100]
+            if not key:
+                continue
+            payload = json.dumps(value, ensure_ascii=False)
+            if len(payload) > MAX_PROGRESS_VALUE_LENGTH:
+                continue
+            cursor.execute('''
+                INSERT OR REPLACE INTO game_progress
+                (user_id, game_type, progress_key, value, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (user_id, game_type, key, payload, now_str))
+            saved += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+    
+    print(f"💾 游戏进度已保存: {game_type}, {saved} 条")
+    return jsonify({'success': True, 'saved': saved})
+
 # 启动服务器
 if __name__ == '__main__':
     print("🚀 温蒂翻译助手后端服务启动")

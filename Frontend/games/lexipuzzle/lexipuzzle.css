@@ -1,0 +1,279 @@
+/* 🧠 词汇拼图 游戏样式 */
+
+.lexi-game {
+    width: 100%;
+}
+
+/* 顶部信息栏：与单词猎人一致 —— 标题一行、三个数据格等宽三列，
+ * 右侧留 44px 给弹窗固定的关闭按钮（× ），避免窄屏被压住。 */
+.lexi-game .game-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-right: 44px;
+    margin-bottom: 14px;
+}
+
+.lexi-game .game-title {
+    font-size: 22px;
+}
+
+.lexi-game .game-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+
+.lexi-game .game-stat-item {
+    min-width: 0;
+    padding: 8px 10px;
+}
+
+.lexi-game .game-stat-value {
+    font-size: 20px;
+}
+
+/* ==================== 题面 ==================== */
+.lexi-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    background: var(--light);
+    border-radius: 18px;
+    text-align: center;
+}
+
+.lexi-speaker-btn {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 19px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s ease;
+}
+
+.lexi-speaker-btn:active {
+    transform: scale(0.92);
+}
+
+.lexi-meaning {
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--primary);
+    line-height: 1.25;
+}
+
+.lexi-level {
+    font-size: 13px;
+    color: #888;
+}
+
+/* ==================== 格子 ==================== */
+.lexi-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+    padding: 4px;
+}
+
+.lexi-slot {
+    width: 46px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: bold;
+    color: var(--text, #333);
+    background: #fff;
+    border: 2px solid var(--secondary);
+    border-bottom-width: 5px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    padding: 0;
+    font-family: inherit;
+}
+
+.lexi-slot.filled {
+    background: var(--light);
+    border-color: var(--primary);
+}
+
+.lexi-slot.locked {
+    background: #fff8e1;
+    border-color: #ffb300;
+    color: #e65100;
+}
+
+.lexi-slot.right {
+    background: #e8f5e9;
+    border-color: #4caf50;
+    color: #2e7d32;
+}
+
+.lexi-slot.wrong {
+    background: #ffebee;
+    border-color: #f44336;
+    color: #c62828;
+    animation: lexiWrongNudge 0.35s ease;
+}
+
+.lexi-slot.solved {
+    background: #4caf50;
+    border-color: #388e3c;
+    color: #fff;
+    animation: lexiSolved 0.45s ease;
+}
+
+@keyframes lexiWrongNudge {
+    0%, 100% { transform: translateX(0); }
+    30% { transform: translateX(-5px); }
+    70% { transform: translateX(5px); }
+}
+
+@keyframes lexiSolved {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.16) rotate(-3deg); }
+    100% { transform: scale(1); }
+}
+
+.lexi-slots.lexi-shake {
+    animation: lexiShake 0.4s ease;
+}
+
+@keyframes lexiShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    45% { transform: translateX(8px); }
+    70% { transform: translateX(-5px); }
+}
+
+/* ==================== 字母池 ==================== */
+.lexi-pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    min-height: 62px;
+    padding: 12px;
+    margin-bottom: 16px;
+    background: linear-gradient(180deg, #fff6fa, #ffffff);
+    border: 2px dashed var(--secondary);
+    border-radius: 18px;
+}
+
+.lexi-tile {
+    width: 48px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(180deg, var(--secondary), var(--primary));
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.2s ease;
+    padding: 0;
+    font-family: inherit;
+}
+
+.lexi-tile:active {
+    transform: scale(0.92);
+}
+
+.lexi-tile.used {
+    opacity: 0.25;
+    transform: scale(0.85);
+    pointer-events: none;
+    box-shadow: none;
+}
+
+/* ==================== 操作与提示 ==================== */
+.lexi-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.lexi-btn {
+    padding: 12px 22px;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary);
+    background: #fff;
+    border: 2px solid var(--secondary);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.lexi-btn:hover {
+    background: var(--light);
+    border-color: var(--primary);
+}
+
+.lexi-btn:active {
+    transform: scale(0.96);
+}
+
+.lexi-feedback {
+    min-height: 26px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: #d84315;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.lexi-feedback.show {
+    opacity: 1;
+}
+
+/* ==================== 响应式 ==================== */
+@media screen and (max-width: 768px) {
+    .lexi-meaning {
+        font-size: 24px;
+    }
+
+    .lexi-slot,
+    .lexi-tile {
+        width: 42px;
+        height: 52px;
+        font-size: 23px;
+    }
+
+    .lexi-slots {
+        gap: 6px;
+    }
+
+    .lexi-pool {
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .lexi-speaker-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 17px;
+    }
+}
