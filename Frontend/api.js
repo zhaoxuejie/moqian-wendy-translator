@@ -1163,6 +1163,30 @@ class WendyApp {
         return list;
     }
 
+    // ==================== 弹窗滚动锁 ====================
+    //
+    // 弹窗是 position: fixed 的覆盖层，但手机上手势滑到弹窗内容末尾时，
+    // 滚动会"穿透"到底层页面 —— 表现就是背景跟着一起滚。
+    //
+    // CSS 的 overscroll-behavior: contain 能挡掉大部分情况，但弹窗内容
+    // 不足一屏（压根没得滚）时挡不住，所以打开期间直接把背景锁住。
+
+    setBackgroundScrollLock(locked) {
+        document.documentElement.classList.toggle('modal-open', locked);
+        document.body.classList.toggle('modal-open', locked);
+    }
+
+    // 统一的详情弹窗显示/隐藏入口：顺便同步背景滚动锁
+    toggleDetailModal(modal, show) {
+        if (!modal) return;
+
+        modal.classList.toggle('show', show);
+
+        // 页面上可能同时有别的详情弹窗（翻译页那个），
+        // 只要还有任意一个开着，锁就不能松开
+        this.setBackgroundScrollLock(!!document.querySelector('.word-detail-modal.show'));
+    }
+
     openWordbookDetail(wordId) {
         const word = (this.wordDatabase || []).find((w) => w.id === wordId);
         if (!word) return;
@@ -1174,7 +1198,7 @@ class WendyApp {
             modal.className = 'word-detail-modal';
             document.body.appendChild(modal);
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.classList.remove('show');
+                if (e.target === modal) this.toggleDetailModal(modal, false);
             });
         }
 
@@ -1228,7 +1252,7 @@ class WendyApp {
         `;
 
         modal.querySelector('.word-detail-close').addEventListener('click', () => {
-            modal.classList.remove('show');
+            this.toggleDetailModal(modal, false);
         });
 
         const speakBtn = modal.querySelector('#wb-detail-speak');
@@ -1245,7 +1269,7 @@ class WendyApp {
             });
         });
 
-        modal.classList.add('show');
+        this.toggleDetailModal(modal, true);
     }
 
     // 朗读单词：优先用教材数据里带的真人发音，拿不到再回退到原来的 TTS
@@ -2893,7 +2917,7 @@ class WendyApp {
             
             detailModal.addEventListener('click', (e) => {
                 if (e.target === detailModal) {
-                    detailModal.classList.remove('show');
+                    this.toggleDetailModal(detailModal, false);
                 }
             });
         }
@@ -2988,7 +3012,7 @@ class WendyApp {
 
         // 关闭按钮事件
         detailModal.querySelector('.word-detail-close').addEventListener('click', () => {
-            detailModal.classList.remove('show');
+            this.toggleDetailModal(detailModal, false);
         });
 
         // 绑定例句播放按钮
@@ -3003,7 +3027,7 @@ class WendyApp {
         });
 
         // 直接显示详情卡片
-        detailModal.classList.add('show');
+        this.toggleDetailModal(detailModal, true);
 
         // 异步加载记忆图片（传入记忆图片关键词，避免重复调用AI）
         this.loadMemoryImage(originalText, cachedMemoryImageUrl || wordDetails?.memory_image_url, memoryImageKeyword);

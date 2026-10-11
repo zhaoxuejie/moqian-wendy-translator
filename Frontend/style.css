@@ -2226,6 +2226,16 @@ footer {
    Word Detail Card
    ============================================ */
 
+/* 详情弹窗打开期间锁住背景滚动。
+   见 api.js 的 setBackgroundScrollLock() ——
+   不锁的话手机上手势滑到弹窗末尾会"穿透"到底层页面，背景跟着一起滚。
+   html 和 body 都锁，因为浏览器对谁才是滚动容器处理不一致。 */
+html.modal-open,
+body.modal-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
 .word-detail-modal {
     position: fixed;
     z-index: 10000;
@@ -2236,6 +2246,11 @@ footer {
     background-color: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(5px);
     overflow-y: auto;
+    /* 弹窗内部滑到末尾时不要把滚动传给底层页面。
+       注意：这只挡得住"弹窗本身能滚"的情况，
+       内容不足一屏时还得靠上面的 modal-open 锁 */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 20px;
     box-sizing: border-box;
     /* 使用 opacity 和 visibility 代替 display: none，避免布局闪烁 */
