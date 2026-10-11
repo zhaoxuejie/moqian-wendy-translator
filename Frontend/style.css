@@ -1055,6 +1055,39 @@ body {
     margin: 0;
 }
 
+/* ---------- 单词详情：异步补全区 ----------
+   同义词 / 反义词 / 词态变化 / 记忆图片。上面是本地数据秒开，
+   这块联网慢慢补，所以要有"查询中"和"按钮"两种状态。 */
+.wordbook-enrich-hint {
+    font-size: 12px;
+    color: #999;
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.wordbook-enrich-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary) 0%, #ff7eb3 100%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wordbook-enrich-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.wordbook-enrich-btn:active {
+    transform: translateY(0);
+}
+
 /* ---------- 成就徽章墙（成长页） ---------- */
 .achievement-section {
     margin-top: 20px;

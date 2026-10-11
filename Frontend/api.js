@@ -1237,6 +1237,11 @@ class WendyApp {
                 </div>
                 ` : ''}
 
+                <!-- 异步补全区：同义词 / 反义词 / 词态变化 / 记忆图片。
+                     上面全是本地数据、秒开；这块要联网，慢慢补，
+                     失败也不影响上面的内容（见 loadWordbookEnrichment） -->
+                <div class="word-detail-section wordbook-enrich" id="wb-detail-enrich"></div>
+
                 <div class="wordbook-detail-meta">
                     <span><i class="fas fa-book"></i> ${this.escapeHtml(sourceLabel)}</span>
                     <span class="wordbook-detail-stars">${stars}</span>
@@ -1270,6 +1275,207 @@ class WendyApp {
         });
 
         this.toggleDetailModal(modal, true);
+
+        // 弹窗带着本地数据秒开，联网的补充信息在后台填
+        this.loadWordbookEnrichment(word);
+    }
+
+    // ==================== 单词详情：异步补全 ====================
+    //
+    // 详情弹窗先用本地数据秒开（断网也能看），同义词 / 反义词 / 词态变化 /
+    // 记忆图片这些需要联网的内容在这里慢慢补。
+    //
+    // 缓存优先策略：
+    //   · word_details 里已经有 → 直接显示
+    //   · 没有 → 显示一个「补充详细信息」按钮，点了才调 AI
+    //     （886 个词全自动补一遍要调 886 次 AI、每次好几秒，没必要）
+
+    async loadWordbookEnrichment(word) {
+        const box = document.getElementById('wb-detail-enrich');
+        if (!box) return;
+
+        // 用户可能很快又点了别的词，用序号把过期结果丢掉
+        this.enrichSeq = (this.enrichSeq || 0) + 1;
+        const seq = this.enrichSeq;
+
+        box.innerHTML = `
+            <h3 class="word-detail-section-title">更多信息</h3>
+            <div class="wordbook-enrich-hint"><i class="fas fa-spinner fa-spin"></i> 查询中…</div>
+        `;
+
+        let cached = null;
+        try {
+            const res = await this.api.getWordDetail(word.english_word);
+            if (res && res.success) cached = res;
+        } catch (err) {
+            // 没有缓存时接口返回 404，属于正常情况，不用报错
+        }
+
+        if (seq !== this.enrichSeq) return;   // 已经切到别的词了
+
+        if (cached) {
+            this.renderWordbookEnrichment(word, cached, box);
+        } else {
+            this.renderWordbookEnrichButton(word, box);
+        }
+    }
+
+    // 没有缓存时的样子：说明 + 一个按钮
+    renderWordbookEnrichButton(word, box) {
+        box.innerHTML = `
+            <h3 class="word-detail-section-title">更多信息</h3>
+            <div class="wordbook-enrich-hint">同义词、反义词、词态变化需要联网生成</div>
+            <button type="button" class="wordbook-enrich-btn" id="wb-enrich-btn">
+                <i class="fas fa-wand-magic-sparkles"></i> 补充详细信息
+            </button>
+        `;
+
+        const btn = box.querySelector('#wb-enrich-btn');
+        if (btn) {
+            btn.addEventListener('click', () => this.generateWordbookEnrichment(word, box));
+        }
+    }
+
+    // 调 AI 生成，成功后写进缓存，下次打开直接显示
+    async generateWordbookEnrichment(word, box) {
+        box.innerHTML = `
+            <h3 class="word-detail-section-title">更多信息</h3>
+            <div class="wordbook-enrich-hint">
+                <i class="fas fa-spinner fa-spin"></i> 正在生成，大约需要几秒…
+            </div>
+        `;
+
+        let ai = null;
+        try {
+            ai = await this.getWordDetails(word.english_word);
+        } catch (err) {
+            console.warn('生成单词详情失败:', err);
+        }
+
+        const hasContent = ai && (
+            (ai.word_forms && ai.word_forms.length > 0) ||
+            (ai.synonyms && ai.synonyms.length > 0) ||
+            (ai.antonyms && ai.antonyms.length > 0)
+        );
+
+        if (!hasContent) {
+            // 失败要能重试，不然用户只能关掉重开
+            box.innerHTML = `
+                <h3 class="word-detail-section-title">更多信息</h3>
+                <div class="wordbook-enrich-hint">暂时拿不到更多信息，检查网络后可以再试一次</div>
+            `;
+            const retry = document.createElement('button');
+            retry.type = 'button';
+            retry.className = 'wordbook-enrich-btn';
+            retry.innerHTML = '<i class="fas fa-rotate-right"></i> 重新生成';
+            retry.addEventListener('click', () => this.generateWordbookEnrichment(word, box));
+            box.appendChild(retry);
+            return;
+        }
+
+        await this.saveWordDetailToDB(word.english_word, {
+            chinese_meaning: word.chinese_meaning || '',
+            part_of_speech: word.part_of_speech || '',
+            pronunciation: word.pronunciation || '',
+            word_forms: ai.word_forms || [],
+            synonyms: ai.synonyms || [],
+            antonyms: ai.antonyms || [],
+            more_examples: ai.more_examples || [],
+            memory_image_keyword: ai.memory_image_keyword || ''
+        });
+
+        this.renderWordbookEnrichment(word, {
+            word_forms: ai.word_forms || [],
+            synonyms: ai.synonyms || [],
+            antonyms: ai.antonyms || [],
+            memory_image_url: '',
+            memory_image_keyword: ai.memory_image_keyword || ''
+        }, box);
+    }
+
+    renderWordbookEnrichment(word, detail, box) {
+        // 同义词/反义词可能是字符串数组（老缓存就是），统一成 {word, meaning}
+        const normalize = (list) => (Array.isArray(list) ? list : []).map((item) => {
+            if (typeof item === 'string') return { word: item, meaning: '' };
+            return { word: (item && item.word) || '', meaning: (item && item.meaning) || '' };
+        }).filter((item) => item.word);
+
+        const wordForms = Array.isArray(detail.word_forms) ? detail.word_forms : [];
+        const synonyms = normalize(detail.synonyms);
+        const antonyms = normalize(detail.antonyms);
+
+        // 复用翻译页那套 class，样式自动一致
+        const blocks = [];
+
+        if (wordForms.length > 0) {
+            blocks.push(`
+                <h3 class="word-detail-section-title">词态变化</h3>
+                <div class="word-detail-forms">
+                    ${wordForms.map((f) => `
+                        <div class="word-form-item">
+                            <span class="word-form-label">${this.escapeHtml(f.label || '')}:</span>
+                            <span class="word-form-value">${this.escapeHtml(f.value || '')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        if (synonyms.length > 0) {
+            blocks.push(`
+                <h3 class="word-detail-section-title">同义词</h3>
+                <div class="word-detail-synonyms">
+                    ${synonyms.map((s) => `
+                        <div class="synonym-item">
+                            <span class="synonym-tag">${this.escapeHtml(s.word)}</span>
+                            ${s.meaning ? `<span class="synonym-meaning">${this.escapeHtml(s.meaning)}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        if (antonyms.length > 0) {
+            blocks.push(`
+                <h3 class="word-detail-section-title">反义词</h3>
+                <div class="word-detail-antonyms">
+                    ${antonyms.map((a) => `
+                        <div class="antonym-item">
+                            <span class="antonym-tag">${this.escapeHtml(a.word)}</span>
+                            ${a.meaning ? `<span class="antonym-meaning">${this.escapeHtml(a.meaning)}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `);
+        }
+
+        const hasImage = !!detail.memory_image_url;
+        const imageKeyword = detail.memory_image_keyword || '';
+        if (hasImage || imageKeyword) {
+            blocks.push(`
+                <h3 class="word-detail-section-title">记忆图片</h3>
+                <div class="memory-image-container" id="wb-detail-image">
+                    <div class="memory-image-loading">正在生成记忆图片...</div>
+                </div>
+            `);
+        }
+
+        box.innerHTML = `
+            <h3 class="word-detail-section-title">更多信息</h3>
+            ${blocks.length > 0
+                ? blocks.join('')
+                : '<div class="wordbook-enrich-hint">这个词暂时没有更多可补充的信息</div>'}
+        `;
+
+        if (hasImage || imageKeyword) {
+            // 传容器进去 —— loadMemoryImage 默认找的是翻译页那个全局 id
+            this.loadMemoryImage(
+                word.english_word,
+                detail.memory_image_url || null,
+                imageKeyword,
+                box.querySelector('#wb-detail-image')
+            );
+        }
     }
 
     // 朗读单词：优先用教材数据里带的真人发音，拿不到再回退到原来的 TTS
@@ -3047,8 +3253,10 @@ class WendyApp {
         }
     }
 
-    async loadMemoryImage(word, existingUrl = null, memoryImageKeyword = '') {
-        const container = document.getElementById('memory-image-container');
+    async loadMemoryImage(word, existingUrl = null, memoryImageKeyword = '', targetContainer = null) {
+        // 默认找翻译页那个全局容器；单词本详情弹窗会把自己的容器传进来 ——
+        // 两个弹窗各有各的记忆图片区，不能都去找同一个 id
+        const container = targetContainer || document.getElementById('memory-image-container');
         if (!container) return;
 
         // 如果已有URL，直接显示（添加点击事件）
