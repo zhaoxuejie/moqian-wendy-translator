@@ -193,17 +193,18 @@
                     </button>
                 </div>
 
+                <!-- 目标进度条：只讲「还差多少」，不重复成长页的累计数字。
+                     放在列表上方，翻单词时随时能看到进度。 -->
+                <div class="goal-bar" id="goal-bar">
+                    <div class="goal-bar-text" id="goal-bar-text"
+                         data-template="🎯 再掌握 {n} 个就达成 {m} 个目标">🎯 再掌握 50 个就达成 50 个目标</div>
+                    <div class="goal-bar-track">
+                        <div class="goal-bar-fill" id="goal-bar-fill"></div>
+                    </div>
+                </div>
+
                 <div class="wordbook" id="wordbook-container">
                     <!-- 单词将通过JavaScript动态生成 -->
-                </div>
-                
-                <div class="milestone">
-                    <h3 id="milestone-title">学习里程碑</h3>
-                    <p id="milestone-text">已学会 <strong>0</strong> 个单词，继续加油！</p>
-                    <div class="progress-bar">
-                        <div class="progress"></div>
-                    </div>
-                    <p id="next-target-text">下一个目标：50个单词</p>
                 </div>
             </div>
             
@@ -318,9 +319,20 @@
                 <div class="milestone">
                     <h3 id="progress-title">成长记录</h3>
                     <p><i class="fas fa-trophy"></i> <span id="streak-text">连续学习 0 天</span></p>
-                    <p><i class="fas fa-star"></i> <span id="badges-text">已获得 0 枚成就徽章</span></p>
                     <p><i class="fas fa-book"></i> <span id="monthly-text">本月掌握了 0 个新单词</span></p>
                     <p><i class="fas fa-graduation-cap"></i> <span id="total-mastered-text">总计掌握了 0 个新单词</span></p>
+                </div>
+
+                <!-- 成就徽章墙：拿到的彩色，没拿到的灰显并显示还差多少 -->
+                <div class="achievement-section">
+                    <div class="achievement-head">
+                        <h3 id="achievement-title">成就徽章</h3>
+                        <span class="achievement-summary" id="achievement-summary"
+                              data-template="已解锁 {earned} / {total}">已解锁 0 / 0</span>
+                    </div>
+                    <div class="achievement-wall" id="achievement-wall">
+                        <div class="achievement-empty">正在加载…</div>
+                    </div>
                 </div>
                 
                 <div class="welcome-message" style="margin-top: 20px;">
@@ -417,10 +429,10 @@
                 translateBtn: "开始翻译",
                 resultTitle: "翻译结果(举例)",
                 addToWordbook: "添加到单词本",
-                milestoneTitle: "学习里程碑",
-                // {n} 会替换成当前里程碑目标（50 → 100 → 200 …），
-                // 换行/文案随意改，数字由 updateProgressDisplay 填
-                nextTargetText: "下一个目标：{n}个单词",
+                // 目标进度条：{n} = 还差几个，{m} = 目标数（由 updateGoalBar 填）
+                goalBarText: "🎯 再掌握 {n} 个就达成 {m} 个目标",
+                achievementTitle: "成就徽章",
+                achievementSummary: "已解锁 {earned} / {total}",
                 progressTitle: "成长记录",
                 discoverTitle: "单词小游戏",
                 discoverSubtitle: "通过游戏轻松记忆单词",
@@ -467,8 +479,9 @@
                 translateBtn: "Translate",
                 resultTitle: "Translation Result",
                 addToWordbook: "Add to Wordbook",
-                milestoneTitle: "Learning Milestone",
-                nextTargetText: "Next goal: {n} words",
+                goalBarText: "🎯 {n} more to reach {m} words",
+                achievementTitle: "Achievements",
+                achievementSummary: "Unlocked {earned} / {total}",
                 progressTitle: "Progress Record",
                 discoverTitle: "Word Games",
                 discoverSubtitle: "Learn words through fun games",
@@ -526,17 +539,26 @@
             document.getElementById('translate-btn').innerHTML = t.translateBtn + ' <i class="fas fa-magic"></i>';
             document.getElementById('result-title').textContent = t.resultTitle;
             document.getElementById('add-to-wordbook-btn').setAttribute('title', t.addToWordbook);
-            document.getElementById('milestone-title').textContent = t.milestoneTitle;
+            // 目标进度条的文案是模板（含 {n} {m} 占位符），交给 updateGoalBar 渲染
+            const goalBarTextEl = document.getElementById('goal-bar-text');
+            if (goalBarTextEl && t.goalBarText) {
+                goalBarTextEl.setAttribute('data-template', t.goalBarText);
+            }
 
-            // 「下一个目标」的文案里含 {n} 占位符，把模板存到 data-template，
-            // 交给 wendyApp.updateNextTargetText() 按当前目标数渲染。
-            // 它还没初始化时先填默认档位兜底，避免显示成字面的 {n}。
-            const nextTargetEl = document.getElementById('next-target-text');
-            nextTargetEl.setAttribute('data-template', t.nextTargetText);
-            if (typeof wendyApp !== 'undefined' && wendyApp && wendyApp.updateNextTargetText) {
-                wendyApp.updateNextTargetText();
-            } else {
-                nextTargetEl.textContent = t.nextTargetText.replace('{n}', 50);
+            // 成就徽章墙的标题与汇总
+            const achievementTitleEl = document.getElementById('achievement-title');
+            if (achievementTitleEl && t.achievementTitle) {
+                achievementTitleEl.textContent = t.achievementTitle;
+            }
+            const achievementSummaryEl = document.getElementById('achievement-summary');
+            if (achievementSummaryEl && t.achievementSummary) {
+                achievementSummaryEl.setAttribute('data-template', t.achievementSummary);
+            }
+
+            // 上面两个块的数字要按当前进度重算一遍，否则切语言后会显示旧值
+            if (typeof wendyApp !== 'undefined' && wendyApp) {
+                if (wendyApp.updateGoalBar) wendyApp.updateGoalBar();
+                if (wendyApp.renderAchievementSummary) wendyApp.renderAchievementSummary();
             }
 
             document.getElementById('progress-title').textContent = t.progressTitle;

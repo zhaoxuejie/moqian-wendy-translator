@@ -723,6 +723,33 @@ def delete_word(word_id):
         'message': '单词删除成功'
     })
 
+def calculate_streak_days(user_id, max_check_days=365):
+    """
+    连续学习天数：从今天往前逐天检查，遇到没有学习记录的那天就停。
+
+    抽成独立函数是因为成就系统也要用同一个口径。
+    """
+    streak_days = 0
+    check_date = date.today()
+    checked_days = 0
+
+    while checked_days < max_check_days:
+        # 检查这一天是否有学习记录（翻译记录或单词本操作）
+        has_activity = query_db('''
+            SELECT COUNT(*) as count FROM learning_progress 
+            WHERE user_id = ? AND learn_date = ?
+        ''', (user_id, check_date.isoformat()), one=True)
+
+        if has_activity and has_activity['count'] > 0:
+            streak_days += 1
+            check_date = check_date - timedelta(days=1)
+            checked_days += 1
+        else:
+            break
+
+    return streak_days
+
+
 # ====== 学习进度 API ======
 @app.route('/api/progress', methods=['GET'])
 @handle_errors
@@ -745,26 +772,8 @@ def get_learning_progress():
         WHERE user_id = ?
     ''', (user['id'],), one=True)
     
-    # 1. 获取连续学习天数（从今天往前连续统计）
-    # 思路：从今天开始往前检查，直到遇到没有学习记录的那天
-    streak_days = 0
-    check_date = date.today()
-    max_check_days = 365  # 最多检查365天，避免无限循环
-    checked_days = 0
-    
-    while checked_days < max_check_days:
-        # 检查这一天是否有学习记录（翻译记录或单词本操作）
-        has_activity = query_db('''
-            SELECT COUNT(*) as count FROM learning_progress 
-            WHERE user_id = ? AND learn_date = ?
-        ''', (user['id'], check_date.isoformat()), one=True)
-        
-        if has_activity and has_activity['count'] > 0:
-            streak_days += 1
-            check_date = check_date - timedelta(days=1)
-            checked_days += 1
-        else:
-            break
+    # 1. 获取连续学习天数
+    streak_days = calculate_streak_days(user['id'])
     
     # 2. 统计掌握单词数（mastery_level = 3）
     mastered_words_stats = query_db('''
@@ -788,8 +797,12 @@ def get_learning_progress():
     
     monthly_mastered_count = monthly_mastered_stats['count'] if monthly_mastered_stats and monthly_mastered_stats['count'] is not None else 0
     
-    # 4. 成就勋章数量 = 掌握单词数 × 3
-    achievements_count = mastered_words_count * 3
+    # 4. 成就徽章数量：用 achievements 表里的**真实**条数。
+    # 早期这里写的是 mastered_words_count * 3 —— 那是个和成就表毫无关系的
+    # 假数字，界面显示 54 枚，而表里其实只有 2 条。
+    # 顺手跑一遍判定，这样不管用户是点星星、玩游戏还是导入教材，
+    # 下次打开应用成就都会自动跟上。
+    _, achievements_count = evaluate_achievements(user['id'])
     
     # 获取本月学习时间（从 learning_progress 表）
     monthly_time = query_db('''
@@ -820,37 +833,159 @@ def get_learning_progress():
         'progress': progress_data
     })
 
+# ====== 成就系统 ======
+#
+# 设计思路：成就是「定义 + 自动判定」，不需要在业务代码里到处埋点。
+# 打开应用或进入成长页时后端算一遍统计、把新达成的写进 achievements 表，
+# 这样不管是点星星、玩游戏还是导入教材，成就都会自动跟上。
+#
+# achievements 表记录「什么时候拿到的」（earned_at），下面的定义表决定
+# 「怎么算达成」。两者配合，既能展示进度，又不会重复授予。
+#
+# ⚠️ 早期版本界面上的「已获得 N 枚成就徽章」是 mastered_words * 3 算出来的
+# 假数字，和这张表毫无关系（表里只有 2 条，界面却显示 54 枚）。现已改成真实条数。
+
+# (type, 图标, 名称, 描述, 统计字段, 达标值)
+ACHIEVEMENT_DEFS = [
+    ('first_word',  '🏆', '第一个单词', '往单词本里添加第一个词',     'total_words',    1),
+    ('master_word', '⭐', '单词掌握',   '掌握第一个单词（3 星）',      'mastered_words', 1),
+    ('word_10',     '🌱', '初出茅庐',   '掌握 10 个单词',             'mastered_words', 10),
+    ('word_50',     '🎯', '目标达成',   '掌握 50 个单词',             'mastered_words', 50),
+    ('word_100',    '🏅', '百词达人',   '掌握 100 个单词',            'mastered_words', 100),
+    ('streak_7',    '🔥', '坚持一周',   '连续学习 7 天',              'streak_days',    7),
+    ('streak_30',   '💎', '坚持一月',   '连续学习 30 天',             'streak_days',    30),
+    ('quiz_100',    '💯', '百题斩',     '累计答对 100 道题',          'correct_total',  100),
+    ('quiz_500',    '🧠', '题海遨游',   '累计答对 500 道题',          'correct_total',  500),
+    ('combo_10',    '⚡', '连击达人',   '单局最高连击达到 10',         'best_combo',     10),
+    ('book_half',   '📖', '学完半册',   '把一册教材的单词掌握过半',     'half_books',     1),
+    ('book_master', '📚', '学完一册',   '把一整册教材的单词全部掌握',   'full_books',     1),
+]
+
+
+def collect_achievement_stats(user_id):
+    """一次性把成就需要的统计数据查出来"""
+    def scalar(sql, args=()):
+        row = query_db(sql, args, one=True)
+        try:
+            return int(row[0]) if row and row[0] is not None else 0
+        except (TypeError, IndexError, KeyError):
+            return 0
+
+    stats = {
+        'total_words': scalar(
+            'SELECT COUNT(*) FROM wordbook WHERE user_id = ?', (user_id,)),
+        'mastered_words': scalar(
+            'SELECT COUNT(*) FROM wordbook WHERE user_id = ? AND mastery_level = 3', (user_id,)),
+        'review_total': scalar(
+            'SELECT COALESCE(SUM(review_count), 0) FROM wordbook WHERE user_id = ?', (user_id,)),
+        'correct_total': scalar(
+            'SELECT COALESCE(SUM(correct_count), 0) FROM game_records WHERE user_id = ?', (user_id,)),
+        'best_combo': scalar(
+            'SELECT COALESCE(MAX(max_combo), 0) FROM game_records WHERE user_id = ?', (user_id,)),
+    }
+
+    stats['streak_days'] = calculate_streak_days(user_id)
+
+    # 「学完半册 / 学完一册」：按教材来源分组看掌握比例。
+    # 手动添加的词（source 为空）不算一册；太小的册也不算，
+    # 否则手动加 20 个词就能白拿一个成就。
+    book_rows = query_db('''
+        SELECT source,
+               COUNT(*) AS total,
+               SUM(CASE WHEN mastery_level = 3 THEN 1 ELSE 0 END) AS mastered
+        FROM wordbook
+        WHERE user_id = ? AND COALESCE(source, '') != ''
+        GROUP BY source
+    ''', (user_id,)) or []
+
+    half_books = 0
+    full_books = 0
+    for row in book_rows:
+        total = row['total'] or 0
+        mastered = row['mastered'] or 0
+        if total < 20:
+            continue
+        if mastered >= total:
+            full_books += 1
+        elif mastered * 2 >= total:
+            half_books += 1
+
+    stats['half_books'] = half_books
+    stats['full_books'] = full_books
+
+    return stats
+
+
+def evaluate_achievements(user_id):
+    """
+    按当前统计检查所有成就，把新达成的写进 achievements 表。
+
+    返回 (全部成就列表含未达成, 已解锁数量)。
+    """
+    stats = collect_achievement_stats(user_id)
+
+    earned_rows = query_db(
+        'SELECT achievement_type, earned_at FROM achievements WHERE user_id = ?',
+        (user_id,)) or []
+    earned_at_map = {row['achievement_type']: row['earned_at'] for row in earned_rows}
+
+    result = []
+    newly_earned = []
+
+    for ach_type, icon, name, description, key, target in ACHIEVEMENT_DEFS:
+        current = stats.get(key, 0) or 0
+        earned = ach_type in earned_at_map
+
+        if not earned and current >= target:
+            check_achievement(user_id, ach_type, name, description, icon)
+            earned = True
+            newly_earned.append(name)
+
+            row = query_db(
+                'SELECT earned_at FROM achievements WHERE user_id = ? AND achievement_type = ?',
+                (user_id, ach_type), one=True)
+            earned_at_map[ach_type] = row['earned_at'] if row else None
+
+        result.append({
+            'type': ach_type,
+            'icon': icon,
+            'name': name,
+            'description': description,
+            'earned': earned,
+            'earned_at': earned_at_map.get(ach_type),
+            # current 封顶到 target，前端画进度条时不用再自己夹
+            'current': min(current, target),
+            'target': target
+        })
+
+    if newly_earned:
+        print('🎖️  新解锁成就: %s' % '、'.join(newly_earned))
+
+    return result, len([a for a in result if a['earned']])
+
+
 @app.route('/api/achievements', methods=['GET'])
 @handle_errors
 def get_achievements():
-    """获取成就列表"""
+    """
+    获取全部成就（含未达成），顺带把新达成的落库。
+
+    每项都带 earned / current / target，前端据此渲染徽章墙：
+    拿到的彩色，没拿到的灰显并展示还差多少。
+    """
     username = request.args.get('username', 'wendy')
     
     user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
     if not user:
         return jsonify({'success': False, 'error': '用户不存在'}), 404
     
-    achievements = query_db('''
-        SELECT * FROM achievements 
-        WHERE user_id = ? 
-        ORDER BY earned_at DESC
-    ''', (user['id'],))
-    
-    achievement_list = []
-    for achievement in achievements:
-        achievement_list.append({
-            'id': achievement['id'],
-            'type': achievement['achievement_type'],
-            'name': achievement['achievement_name'],
-            'description': achievement['achievement_description'],
-            'badge_icon': achievement['badge_icon'],
-            'earned_at': achievement['earned_at']
-        })
+    achievements, earned_count = evaluate_achievements(user['id'])
     
     return jsonify({
         'success': True,
-        'achievements': achievement_list,
-        'total': len(achievement_list)
+        'achievements': achievements,
+        'earned_count': earned_count,
+        'total': len(achievements)
     })
 
 # ====== 鼓励话语 API ======

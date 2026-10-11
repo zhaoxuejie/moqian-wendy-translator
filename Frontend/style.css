@@ -992,6 +992,165 @@ body {
     border-radius: 5px;
 }
 
+/* ---------- 目标进度条（单词本页） ----------
+   只讲「还差多少 + 进度」，不重复成长页已有的累计数字。
+   放在单词列表上方，翻单词时随时能看到。 */
+.goal-bar {
+    background: linear-gradient(135deg, #fff0f6 0%, #eaf6ff 100%);
+    border: 1px solid rgba(255, 105, 180, 0.15);
+    border-radius: 14px;
+    padding: 10px 14px 12px;
+    margin-bottom: 14px;
+}
+
+.goal-bar-text {
+    font-size: 13px;
+    color: #7a6a72;
+    margin-bottom: 8px;
+}
+
+.goal-bar-track {
+    height: 8px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.goal-bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, #ff7eb3 100%);
+    transition: width 0.5s ease;
+}
+
+/* ---------- 成就徽章墙（成长页） ---------- */
+.achievement-section {
+    margin-top: 20px;
+}
+
+.achievement-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.achievement-head h3 {
+    margin: 0;
+    color: var(--primary);
+}
+
+.achievement-summary {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+}
+
+.achievement-wall {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.achievement-badge {
+    background-color: white;
+    border-radius: 14px;
+    padding: 12px 8px 10px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease;
+}
+
+.achievement-badge.is-earned {
+    border: 1px solid rgba(255, 105, 180, 0.25);
+}
+
+.achievement-badge.is-earned:hover {
+    transform: translateY(-2px);
+}
+
+.achievement-icon {
+    font-size: 26px;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.achievement-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #444;
+    margin-bottom: 2px;
+}
+
+.achievement-desc {
+    font-size: 10px;
+    color: #aaa;
+    line-height: 1.3;
+    /* 说明文字最多两行，避免徽章高度参差不齐 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.achievement-progress {
+    font-size: 10px;
+    color: #c0a0b0;
+    margin-top: 5px;
+}
+
+/* 未解锁：整体灰显，一眼和拿到的区分开 */
+.achievement-badge.is-locked {
+    background-color: #fafafa;
+    box-shadow: none;
+}
+
+.achievement-badge.is-locked .achievement-icon {
+    filter: grayscale(1);
+    opacity: 0.35;
+}
+
+.achievement-badge.is-locked .achievement-name {
+    color: #bbb;
+}
+
+.achievement-badge.is-locked .achievement-desc {
+    color: #ccc;
+}
+
+.achievement-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+    padding: 20px 0;
+}
+
+@media screen and (max-width: 480px) {
+    .achievement-wall {
+        gap: 8px;
+    }
+
+    .achievement-badge {
+        padding: 10px 6px 8px;
+        border-radius: 12px;
+    }
+
+    .achievement-icon {
+        font-size: 22px;
+    }
+
+    .achievement-name {
+        font-size: 11px;
+    }
+
+    .achievement-desc {
+        font-size: 9px;
+    }
+}
+
 .settings-menu {
     position: absolute;
     top: 80px;

@@ -282,6 +282,7 @@ class WendyApp {
         this.currentWordbookSource = ''; // 单词本当前筛选的教材册次（空 = 全部）
         this.wordbookSources = []; // 各来源的统计（在学词数 / 总数），用于筛选下拉
         this.milestoneTarget = 0; // 当前里程碑目标（已掌握多少词），由进度数据算出
+        this.achievements = []; // 全部成就（含未达成），进成长页时加载
         // 后端语音合成的发音人（百度基础版）。
         // 浏览器没有系统 TTS 引擎时，用这些填充「语音设置」面板，
         // 否则面板只会显示「暂无中文语音」，用户根本没得选。
@@ -1618,10 +1619,12 @@ class WendyApp {
                         starsContainer.innerHTML = this.getStarsHTML(masteryLevel);
                     }
 
-                    // 跨过 3 星边界时，筛选下拉里的「在学的词数」变了，
-                    // 要刷新一下，否则下拉会一直显示旧数字
+                    // 跨过 3 星边界时，这个词在「在学 / 已掌握」之间移动了：
+                    //   · 筛选下拉里的「在学的词数」要刷新
+                    //   · 目标进度条和成就也可能跟着变（比如刚好凑满 10 个）
                     if (wasActive !== nowActive) {
                         this.refreshWordbookStats();
+                        this.loadLearningProgress();
                     }
                 }
 
@@ -1682,32 +1685,17 @@ class WendyApp {
         console.log('achievements_count:', progress.achievements_count, '类型:', typeof progress.achievements_count);
         console.log('words_this_month:', progress.words_this_month, '类型:', typeof progress.words_this_month);
 
-        // 更新里程碑显示
+        // 更新目标进度条
         //
         // 口径必须用「已掌握」（mastery_level = 3，也就是成长页统计的那个），
         // 不能用 progress.total_words —— 那是单词本里的全部单词数。
-        // 导入整册教材之后 total_words 会变成几百上千，
-        // 拿它当"已学会"会显示成"已学会 886 个单词"，明显不对。
+        // 导入整册教材之后 total_words 会变成几百上千。
         const masteredWords = Number(progress.total_mastered_words) || 0;
 
         // 目标按已掌握数自动升档（50 → 100 → 200 …），
         // 这样进度条不会在满格之后一直卡住
-        const milestoneTarget = nextMilestoneTarget(masteredWords);
-        this.milestoneTarget = milestoneTarget;
-
-        const milestoneText = document.getElementById('milestone-text');
-        if (milestoneText) {
-            milestoneText.innerHTML = `已学会 <strong>${masteredWords}</strong> 个单词，继续加油！`;
-        }
-
-        // 进度条与里程碑同一个口径，否则数字和进度会对不上
-        const progressBar = document.querySelector('.progress');
-        if (progressBar) {
-            const progressPercent = Math.min((masteredWords / milestoneTarget) * 100, 100);
-            progressBar.style.width = `${progressPercent}%`;
-        }
-
-        this.updateNextTargetText();
+        this.milestoneTarget = nextMilestoneTarget(masteredWords);
+        this.updateGoalBar();
 
         // 更新成长记录
         const streakText = document.getElementById('streak-text');
@@ -1716,22 +1704,8 @@ class WendyApp {
             streakText.textContent = `连续学习 ${streakDays} 天`;
         }
 
-        const badgesText = document.getElementById('badges-text');
-        if (badgesText) {
-            // 确保正确处理 null、undefined、NaN 等情况
-            const achievementsCount = (progress.achievements_count !== null && progress.achievements_count !== undefined) 
-                ? Number(progress.achievements_count) 
-                : 0;
-            const newText = `已获得 ${achievementsCount} 枚成就徽章`;
-            // 使用 innerHTML 确保完全替换内容
-            badgesText.innerHTML = newText;
-            console.log('更新成就徽章显示:', achievementsCount, '元素:', badgesText, '新文本:', newText);
-            console.log('更新后元素内容:', badgesText.innerHTML);
-            // 强制触发重绘
-            badgesText.offsetHeight;
-        } else {
-            console.error('未找到 badges-text 元素');
-        }
+        // 成就徽章改由成长页的「成就墙」展示（loadAchievements + renderAchievementWall），
+        // 这里不再更新那个假的「已获得 N 枚成就徽章」文本。
 
         const monthlyText = document.getElementById('monthly-text');
         if (monthlyText) {
@@ -1767,16 +1741,96 @@ class WendyApp {
         }
     }
 
-    // 渲染「下一个目标：N个单词」这句。
-    // 目标是动态的，所以文案模板（含 {n} 占位符）由 updateLanguage 写进
-    // data-template，这里只负责把 {n} 换成当前目标数。
-    updateNextTargetText() {
-        const el = document.getElementById('next-target-text');
+    // 渲染目标进度条。
+    // 只讲「还差多少 + 进度」，不重复成长页已有的累计数字。
+    // 文案模板（含 {n} 还差几个、{m} 目标数）由 updateLanguage 写进 data-template。
+    updateGoalBar() {
+        const textEl = document.getElementById('goal-bar-text');
+        const fillEl = document.getElementById('goal-bar-fill');
+        if (!textEl && !fillEl) return;
+
+        const masteredWords = Number((this.learningProgress || {}).total_mastered_words) || 0;
+        const target = this.milestoneTarget || nextMilestoneTarget(masteredWords);
+        const remain = Math.max(0, target - masteredWords);
+
+        if (textEl) {
+            const template = textEl.getAttribute('data-template') || '🎯 再掌握 {n} 个就达成 {m} 个目标';
+            textEl.textContent = template.replace('{n}', remain).replace('{m}', target);
+        }
+
+        if (fillEl) {
+            const percent = target > 0 ? Math.min((masteredWords / target) * 100, 100) : 0;
+            fillEl.style.width = `${percent}%`;
+        }
+    }
+
+    // ==================== 成就徽章 ====================
+
+    // 拉取全部成就（含未达成）并渲染徽章墙。
+    // 后端在这次请求里会顺带把新达成的落库，所以一进成长页就会自动更新。
+    async loadAchievements() {
+        try {
+            const data = await this.api.getAchievements();
+            if (data && data.success) {
+                this.achievements = data.achievements || [];
+                this.renderAchievementWall();
+                this.renderAchievementSummary(data.earned_count, data.total);
+            }
+        } catch (err) {
+            console.error('加载成就失败:', err);
+            const wall = document.getElementById('achievement-wall');
+            if (wall) wall.innerHTML = '<div class="achievement-empty">成就加载失败，稍后再试</div>';
+        }
+    }
+
+    // 汇总文案「已解锁 N / M」。
+    // 不传参数时用缓存的数据 —— 切换语言时会这样调。
+    renderAchievementSummary(earned, total) {
+        const el = document.getElementById('achievement-summary');
         if (!el) return;
 
-        const template = el.getAttribute('data-template') || '下一个目标：{n}个单词';
-        const target = this.milestoneTarget || MILESTONE_TARGETS[0];
-        el.textContent = template.replace('{n}', target);
+        const list = this.achievements || [];
+        if (earned === undefined) earned = list.filter((a) => a.earned).length;
+        if (total === undefined) total = list.length;
+
+        const template = el.getAttribute('data-template') || '已解锁 {earned} / {total}';
+        el.textContent = template.replace('{earned}', earned).replace('{total}', total);
+    }
+
+    renderAchievementWall() {
+        const wall = document.getElementById('achievement-wall');
+        if (!wall) return;
+
+        const list = this.achievements || [];
+        if (list.length === 0) {
+            wall.innerHTML = '<div class="achievement-empty">还没有成就</div>';
+            return;
+        }
+
+        wall.innerHTML = '';
+
+        list.forEach((item) => {
+            const tile = document.createElement('div');
+            tile.className = 'achievement-badge ' + (item.earned ? 'is-earned' : 'is-locked');
+            tile.setAttribute('title', item.description || '');
+
+            // 已解锁显示拿到日期，未解锁显示进度（还差多少）
+            let footer;
+            if (item.earned) {
+                footer = item.earned_at ? String(item.earned_at).slice(0, 10) : '已解锁';
+            } else {
+                footer = `${item.current} / ${item.target}`;
+            }
+
+            tile.innerHTML = `
+                <div class="achievement-icon">${item.icon || '🏅'}</div>
+                <div class="achievement-name">${this.escapeHtml(item.name || '')}</div>
+                <div class="achievement-desc">${this.escapeHtml(item.description || '')}</div>
+                <div class="achievement-progress">${this.escapeHtml(footer)}</div>
+            `;
+
+            wall.appendChild(tile);
+        });
     }
 
     // 应用用户设置
@@ -3410,6 +3464,12 @@ class WendyApp {
                 this.renderGameCards();
             }, 100);
         }
+
+        // 进入成长页时刷新成就墙 ——
+        // 后端会在这次请求里把新达成的成就落库，所以刚打完游戏进来就能看到新徽章
+        if (tabName === 'progress') {
+            this.loadAchievements();
+        }
     }
 
     showNotification(message, type = 'info') {
@@ -4021,28 +4081,6 @@ class WendyApp {
                 modeBonusEn[index].style.display = lang === 'zh' ? 'none' : 'block';
             }
         });
-    }
-
-    switchToTab(tabName) {
-        // 移除所有活跃状态
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
-        // 激活指定页签
-        const tabElement = document.querySelector(`[data-tab="${tabName}"]`);
-        const contentElement = document.getElementById(`${tabName}-tab`);
-        
-        if (tabElement) tabElement.classList.add('active');
-        if (contentElement) contentElement.classList.add('active');
-        
-        // 如果是发现页，加载游戏里程碑和渲染游戏卡片
-        if (tabName === 'discover') {
-            this.loadGameMilestones('word-challenge'); // 默认显示单词挑战的里程碑
-            // 延迟渲染，确保DOM已加载
-            setTimeout(() => {
-                this.renderGameCards();
-            }, 100);
-        }
     }
 
     // 显示祝贺消息
