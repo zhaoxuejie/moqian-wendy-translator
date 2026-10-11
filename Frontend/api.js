@@ -1386,26 +1386,33 @@ class WendyApp {
             return;
         }
         
-        masteredWords.forEach(word => {
+        // 一行一个单词：序号 + 单词 / 音标 / 释义 + 朗读、删除按钮。
+        // 原来是一格一格的网格卡片，词一多就一大片，改成列表紧凑得多。
+        masteredWords.forEach((word, index) => {
             const wordDiv = document.createElement('div');
             wordDiv.className = 'mastered-word-item';
-            
-            // 构建音标（如果有）
-            const pronunciationHtml = word.pronunciation && word.pronunciation.trim() 
-                ? `<div class="word-pronunciation">${word.pronunciation}</div>` 
+
+            // 音标（如果有）
+            const pronunciationHtml = word.pronunciation && word.pronunciation.trim()
+                ? `<span class="word-pronunciation">${word.pronunciation}</span>`
                 : '';
-            
+
             const safeWord = String(word.english_word).replace(/"/g, '&quot;');
             wordDiv.innerHTML = `
-                <div class="mastered-word-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
-                    <i class="fas fa-trash"></i>
+                <div class="mastered-word-index">${index + 1}</div>
+                <div class="mastered-word-main">
+                    <span class="word-text">${word.english_word}</span>
+                    ${pronunciationHtml}
+                    <span class="word-meaning">${word.chinese_meaning}</span>
                 </div>
-                <div class="mastered-word-speak" data-word="${safeWord}" title="朗读">
-                    <i class="fas fa-volume-up"></i>
+                <div class="mastered-word-actions">
+                    <div class="mastered-word-speak" data-word="${safeWord}" title="朗读">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                    <div class="mastered-word-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
+                        <i class="fas fa-trash"></i>
+                    </div>
                 </div>
-                <div class="word-text">${word.english_word}</div>
-                ${pronunciationHtml}
-                <div class="word-meaning">${word.chinese_meaning}</div>
             `;
             masteredContainer.appendChild(wordDiv);
         });

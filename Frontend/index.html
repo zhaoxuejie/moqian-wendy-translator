@@ -193,18 +193,19 @@
                     </button>
                 </div>
 
-                <!-- 目标进度条：只讲「还差多少」，不重复成长页的累计数字。
-                     放在列表上方，翻单词时随时能看到进度。 -->
-                <div class="goal-bar" id="goal-bar">
-                    <div class="goal-bar-text" id="goal-bar-text"
-                         data-template="🎯 再掌握 {n} 个就达成 {m} 个目标">🎯 再掌握 50 个就达成 50 个目标</div>
-                    <div class="goal-bar-track">
-                        <div class="goal-bar-fill" id="goal-bar-fill"></div>
-                    </div>
+                <div class="wordbook" id="wordbook-container">
+                    <!-- 单词和分页控件都由 JavaScript 渲染在这里 -->
                 </div>
 
-                <div class="wordbook" id="wordbook-container">
-                    <!-- 单词将通过JavaScript动态生成 -->
+                <!-- 学习里程碑：放在分页下方，沿用原来的卡片样式。
+                     内容只讲「还差多少」，累计数字在成长页，两处不重复。 -->
+                <div class="milestone" id="goal-milestone">
+                    <h3 id="goal-milestone-title">学习里程碑</h3>
+                    <p id="goal-bar-text"
+                       data-template="🎯 再掌握 {n} 个就达成 {m} 个目标">🎯 再掌握 50 个就达成 50 个目标</p>
+                    <div class="progress-bar">
+                        <div class="progress" id="goal-bar-fill"></div>
+                    </div>
                 </div>
             </div>
             
@@ -315,13 +316,6 @@
                         <!-- 已掌握的单词将在这里动态显示 -->
                     </div>
                 </div>
-                
-                <div class="milestone">
-                    <h3 id="progress-title">成长记录</h3>
-                    <p><i class="fas fa-trophy"></i> <span id="streak-text">连续学习 0 天</span></p>
-                    <p><i class="fas fa-book"></i> <span id="monthly-text">本月掌握了 0 个新单词</span></p>
-                    <p><i class="fas fa-graduation-cap"></i> <span id="total-mastered-text">总计掌握了 0 个新单词</span></p>
-                </div>
 
                 <!-- 成就徽章墙：拿到的彩色，没拿到的灰显并显示还差多少 -->
                 <div class="achievement-section">
@@ -333,6 +327,13 @@
                     <div class="achievement-wall" id="achievement-wall">
                         <div class="achievement-empty">正在加载…</div>
                     </div>
+                </div>
+
+                <div class="milestone">
+                    <h3 id="progress-title">成长记录</h3>
+                    <p><i class="fas fa-trophy"></i> <span id="streak-text">连续学习 0 天</span></p>
+                    <p><i class="fas fa-book"></i> <span id="monthly-text">本月掌握了 0 个新单词</span></p>
+                    <p><i class="fas fa-graduation-cap"></i> <span id="total-mastered-text">总计掌握了 0 个新单词</span></p>
                 </div>
                 
                 <div class="welcome-message" style="margin-top: 20px;">
@@ -430,6 +431,7 @@
                 resultTitle: "翻译结果(举例)",
                 addToWordbook: "添加到单词本",
                 // 目标进度条：{n} = 还差几个，{m} = 目标数（由 updateGoalBar 填）
+                goalMilestoneTitle: "学习里程碑",
                 goalBarText: "🎯 再掌握 {n} 个就达成 {m} 个目标",
                 achievementTitle: "成就徽章",
                 achievementSummary: "已解锁 {earned} / {total}",
@@ -479,6 +481,7 @@
                 translateBtn: "Translate",
                 resultTitle: "Translation Result",
                 addToWordbook: "Add to Wordbook",
+                goalMilestoneTitle: "Learning Milestone",
                 goalBarText: "🎯 {n} more to reach {m} words",
                 achievementTitle: "Achievements",
                 achievementSummary: "Unlocked {earned} / {total}",
@@ -540,6 +543,11 @@
             document.getElementById('result-title').textContent = t.resultTitle;
             document.getElementById('add-to-wordbook-btn').setAttribute('title', t.addToWordbook);
             // 目标进度条的文案是模板（含 {n} {m} 占位符），交给 updateGoalBar 渲染
+            const goalMilestoneTitleEl = document.getElementById('goal-milestone-title');
+            if (goalMilestoneTitleEl && t.goalMilestoneTitle) {
+                goalMilestoneTitleEl.textContent = t.goalMilestoneTitle;
+            }
+
             const goalBarTextEl = document.getElementById('goal-bar-text');
             if (goalBarTextEl && t.goalBarText) {
                 goalBarTextEl.setAttribute('data-template', t.goalBarText);

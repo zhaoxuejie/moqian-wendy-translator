@@ -513,35 +513,95 @@ body {
     text-align: center;
 }
 
+/* 我的单词：一行一个（列表形式）。
+   原来是一格一格的网格卡片，词一多就一大片、还不容易扫读。 */
 .mastered-words {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
-    max-height: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 260px;
     overflow-y: auto;
 }
 
 .mastered-word-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     background-color: white;
-    border-radius: 8px;
-    padding: 10px;
-    text-align: center;
+    border-radius: 10px;
+    padding: 8px 10px;
     border: 1px solid var(--secondary);
     font-size: 14px;
-    position: relative;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: box-shadow 0.2s ease;
 }
 
 .mastered-word-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.mastered-word-item .word-pronunciation {
+/* 行号 1、2、3… */
+.mastered-word-index {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mastered-word-main {
+    flex: 1 1 auto;
+    min-width: 0;   /* 让下面的释义能正常出现省略号 */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+}
+
+.mastered-word-main .word-text {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.mastered-word-main .word-pronunciation {
+    font-size: 11px;
+    color: #999;
+    margin: 0;
+}
+
+/* 释义单独占一行，太长就省略号 */
+.mastered-word-main .word-meaning {
+    flex: 0 0 100%;
     font-size: 12px;
-    color: #888;
-    margin-top: 4px;
+    color: var(--text);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mastered-word-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+}
+
+/* 列表形式下按钮常显 —— 卡片那套是悬停才显，行列表里悬停反馈太弱 */
+.mastered-word-actions .mastered-word-speak,
+.mastered-word-actions .mastered-word-delete {
+    position: static;
+    opacity: 1;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
 }
 
 .mastered-word-speak {
@@ -569,12 +629,6 @@ body {
 .mastered-word-speak:hover {
     background-color: var(--primary);
     transform: scale(1.1);
-}
-
-.mastered-word-item .word-meaning {
-    font-size: 13px;
-    color: var(--text);
-    margin-top: 4px;
 }
 
 /* 单词本朗读图标样式 */
@@ -992,36 +1046,13 @@ body {
     border-radius: 5px;
 }
 
-/* ---------- 目标进度条（单词本页） ----------
-   只讲「还差多少 + 进度」，不重复成长页已有的累计数字。
-   放在单词列表上方，翻单词时随时能看到。 */
-.goal-bar {
-    background: linear-gradient(135deg, #fff0f6 0%, #eaf6ff 100%);
-    border: 1px solid rgba(255, 105, 180, 0.15);
-    border-radius: 14px;
-    padding: 10px 14px 12px;
-    margin-bottom: 14px;
-}
-
-.goal-bar-text {
-    font-size: 13px;
-    color: #7a6a72;
-    margin-bottom: 8px;
-}
-
-.goal-bar-track {
-    height: 8px;
-    background-color: rgba(255, 255, 255, 0.9);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.goal-bar-fill {
-    height: 100%;
-    width: 0;
-    border-radius: 4px;
-    background: linear-gradient(90deg, var(--primary) 0%, #ff7eb3 100%);
-    transition: width 0.5s ease;
+/* ---------- 学习里程碑（单词本页，分页下方） ----------
+   卡片外观沿用 .milestone（渐变底 + 居中），这里只补目标文案的样式。
+   内容只讲「还差多少 + 进度」，累计数字在成长页，两处不重复。 */
+#goal-bar-text {
+    color: #6b5b63;
+    font-size: 14px;
+    margin: 0;
 }
 
 /* ---------- 成就徽章墙（成长页） ---------- */
@@ -1050,16 +1081,16 @@ body {
 
 .achievement-wall {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
 }
 
 .achievement-badge {
     background-color: white;
-    border-radius: 14px;
-    padding: 12px 8px 10px;
+    border-radius: 10px;
+    padding: 8px 4px 6px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     transition: transform 0.2s ease;
 }
 
@@ -1072,22 +1103,22 @@ body {
 }
 
 .achievement-icon {
-    font-size: 26px;
+    font-size: 20px;
     line-height: 1.2;
-    margin-bottom: 4px;
-}
-
-.achievement-name {
-    font-size: 12px;
-    font-weight: bold;
-    color: #444;
     margin-bottom: 2px;
 }
 
+.achievement-name {
+    font-size: 11px;
+    font-weight: bold;
+    color: #444;
+    margin-bottom: 1px;
+}
+
 .achievement-desc {
-    font-size: 10px;
+    font-size: 9px;
     color: #aaa;
-    line-height: 1.3;
+    line-height: 1.25;
     /* 说明文字最多两行，避免徽章高度参差不齐 */
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -1096,9 +1127,9 @@ body {
 }
 
 .achievement-progress {
-    font-size: 10px;
+    font-size: 9px;
     color: #c0a0b0;
-    margin-top: 5px;
+    margin-top: 3px;
 }
 
 /* 未解锁：整体灰显，一眼和拿到的区分开 */
@@ -1126,29 +1157,6 @@ body {
     color: #aaa;
     font-size: 13px;
     padding: 20px 0;
-}
-
-@media screen and (max-width: 480px) {
-    .achievement-wall {
-        gap: 8px;
-    }
-
-    .achievement-badge {
-        padding: 10px 6px 8px;
-        border-radius: 12px;
-    }
-
-    .achievement-icon {
-        font-size: 22px;
-    }
-
-    .achievement-name {
-        font-size: 11px;
-    }
-
-    .achievement-desc {
-        font-size: 9px;
-    }
 }
 
 .settings-menu {
