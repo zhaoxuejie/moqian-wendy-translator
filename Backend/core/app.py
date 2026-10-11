@@ -78,7 +78,10 @@ CORS(app)  # 允许跨域请求
 # 配置
 # 数据库路径：优先使用环境变量，否则使用默认路径（绝对路径，不依赖当前工作目录）
 DATABASE = os.getenv('DATABASE_PATH', os.path.join(DATABASE_DIR, 'wendy_translator.db'))
-SECRET_KEY = 'wendy-translator-secret-key-2024'
+
+# Flask 会话签名密钥。应用当前未使用会话登录，所以不再写死固定值；
+# 如需启用会话，请通过环境变量 FLASK_SECRET_KEY 设置（这样服务重启后会话不会失效）。
+SECRET_KEY = os.getenv('FLASK_SECRET_KEY') or os.urandom(32).hex()
 
 # 导入DeepSeek服务
 from services.deepseek_service import deepseek_service
