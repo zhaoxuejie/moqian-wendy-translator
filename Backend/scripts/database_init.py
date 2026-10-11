@@ -124,12 +124,17 @@ def init_database(quiet=False):
                 mastery_level INTEGER DEFAULT 0,
                 review_count INTEGER DEFAULT 0,
                 last_reviewed TIMESTAMP,
+                source VARCHAR(100) DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id),
                 UNIQUE(user_id, english_word)
             )
         """)
+        
+        # 注意：source 字段对老库的迁移不在这里做，而是在
+        # ensure_wordbook_source_column() 里 —— 因为 init_database()
+        # 只在全新数据库时执行，老库根本走不到这里。
         
         # 创建翻译历史表
         cursor.execute("""
@@ -458,6 +463,58 @@ def ensure_game_tables(quiet=False):
     finally:
         conn.close()
 
+def ensure_wordbook_source_column(quiet=False):
+    """
+    确保单词本表有 source 字段（记录单词来自哪本教材，导入词书后按册筛选用）。
+
+    为什么单独抽一个函数：
+        init_database() 只在**全新数据库**时执行，已有数据库走的是
+        check_database() 分支。补字段这类迁移必须像 ensure_game_tables()
+        一样「全新库和老库都走一遍」，否则老库永远拿不到新字段 ——
+        这就是本函数存在的唯一原因，别把它挪回 init_database()。
+    """
+    db_path = os.getenv('DATABASE_PATH')
+    if not db_path:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))
+        db_path = os.path.join(project_root, 'database', 'wendy_translator.db')
+    
+    if not os.path.exists(db_path):
+        return False
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("PRAGMA table_info(wordbook)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if not columns:
+            # 单词本表还不存在，init_database() 会建（建表语句里已含 source），这里不用管
+            return False
+        
+        added = False
+        if 'source' not in columns:
+            cursor.execute("ALTER TABLE wordbook ADD COLUMN source VARCHAR(100) DEFAULT ''")
+            added = True
+        
+        # 按册筛选时不用全表扫
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_wordbook_source ON wordbook(user_id, source)")
+        conn.commit()
+        
+        if not quiet:
+            if added:
+                print("✅ 单词本表已补充 source 字段（教材来源）")
+            else:
+                print("✅ 单词本 source 字段已就绪")
+        return True
+    except Exception as e:
+        print(f"❌ 补充单词本 source 字段失败: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
 if __name__ == "__main__":
     quiet_mode = os.getenv('DATABASE_INIT_QUIET', 'false').lower() == 'true'
     
@@ -485,6 +542,9 @@ if __name__ == "__main__":
     
     # 确保游戏回流数据表存在（全新库和老库都走一遍，幂等）
     ensure_game_tables(quiet=quiet_mode)
+    
+    # 确保单词本有 source 字段（教材来源，导入词书后按册筛选用）
+    ensure_wordbook_source_column(quiet=quiet_mode)
     
     if not quiet_mode:
         print("=" * 40)

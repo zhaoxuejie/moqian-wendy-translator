@@ -65,8 +65,30 @@ class WendyAPI {
     }
 
     // ====== 单词本管理 ======
-    async getWordbook() {
-        return await this.request(`/api/wordbook?username=${this.username}`);
+    async getWordbook(source = '') {
+        let url = `/api/wordbook?username=${this.username}`;
+        // source 为空表示不筛选，返回全部单词
+        if (source) {
+            url += `&source=${encodeURIComponent(source)}`;
+        }
+        return await this.request(url);
+    }
+
+    // ====== 教材词书 ======
+    // 列出 data/wordlists/ 里可导入的教材词书（含每册词数与已导入数）
+    async getWordlists() {
+        return await this.request(`/api/wordlists?username=${this.username}`);
+    }
+
+    // 整册导入单词本。已存在的单词由后端自动跳过，可安全重复调用
+    async importWordlist(source) {
+        return await this.request('/api/wordbook/import', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: this.username,
+                source: source
+            })
+        });
     }
 
     async addToWordbook(wordData) {
@@ -227,6 +249,7 @@ class WendyApp {
         this.selectedVoiceLang = ''; // 用户选择的语音语言
         this.availableVoices = []; // 可用的语音列表
         this.currentAudio = null; // 后端合成时正在播放的 <audio> 元素
+        this.currentWordbookSource = ''; // 单词本当前筛选的教材册次（空 = 全部）
         // 后端语音合成的发音人（百度基础版）。
         // 浏览器没有系统 TTS 引擎时，用这些填充「语音设置」面板，
         // 否则面板只会显示「暂无中文语音」，用户根本没得选。
@@ -317,17 +340,184 @@ class WendyApp {
         }
     }
 
-    // 加载单词本
+    // 加载单词本（可按教材册次筛选）
     async loadWordbook() {
         try {
-            const response = await this.api.getWordbook();
+            const response = await this.api.getWordbook(this.currentWordbookSource || '');
             if (response.success) {
                 this.wordDatabase = response.words;
+                this.renderSourceFilter(response.sources);
                 this.renderWordbook();
                 console.log(`加载了 ${response.total} 个单词`);
             }
         } catch (error) {
             console.error('加载单词本失败:', error);
+        }
+    }
+
+    // ==================== 教材词书导入 ====================
+
+    // 转义后再拼进 innerHTML，避免词书名里的特殊字符破坏页面
+    escapeHtml(text) {
+        return String(text === null || text === undefined ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 渲染「按来源筛选」下拉。sources 由后端按单词本实际情况计算，
+    // 所以只列出真的有词的册次，不会出现空选项。
+    renderSourceFilter(sources) {
+        const select = document.getElementById('wordbook-source-filter');
+        if (!select) return;
+
+        const list = sources || [];
+        const total = list.reduce((sum, item) => sum + (item.count || 0), 0);
+        const current = this.currentWordbookSource || '';
+
+        select.innerHTML = '';
+
+        const allOption = document.createElement('option');
+        allOption.value = '';
+        allOption.textContent = `全部单词（${total}）`;
+        select.appendChild(allOption);
+
+        list.forEach((item) => {
+            const option = document.createElement('option');
+            if (item.source) {
+                option.value = item.source;
+                option.textContent = `${item.source}（${item.count}）`;
+            } else {
+                // 来源为空 = 手动添加/翻译时收藏的词，单独归一类
+                option.value = '__none__';
+                option.textContent = `手动添加（${item.count}）`;
+            }
+            select.appendChild(option);
+        });
+
+        // 当前选中的来源可能已经不存在了（比如词被删光），回落到「全部」
+        const stillThere = Array.prototype.some.call(
+            select.options,
+            (opt) => opt.value === current
+        );
+        if (!stillThere) {
+            this.currentWordbookSource = '';
+            select.value = '';
+        } else {
+            select.value = current;
+        }
+    }
+
+    // 打开导入弹窗
+    async openImportDialog() {
+        const overlay = document.getElementById('import-overlay');
+        const list = document.getElementById('import-list');
+        if (!overlay || !list) return;
+
+        overlay.classList.add('show');
+        list.innerHTML = '<div class="import-empty">正在读取词书…</div>';
+
+        try {
+            const data = await this.api.getWordlists();
+            this.renderWordlistOptions(data);
+        } catch (err) {
+            console.error('读取词书失败:', err);
+            list.innerHTML = '<div class="import-empty">读取词书失败：'
+                + this.escapeHtml(err.message) + '</div>';
+        }
+    }
+
+    closeImportDialog() {
+        const overlay = document.getElementById('import-overlay');
+        if (overlay) overlay.classList.remove('show');
+    }
+
+    // 把后端返回的词书列表渲染成可点的条目
+    renderWordlistOptions(data) {
+        const list = document.getElementById('import-list');
+        if (!list) return;
+
+        if (!data || !data.available) {
+            list.innerHTML = '<div class="import-empty">'
+                + '还没有任何词书。<br><br>'
+                + '请在电脑上运行：<br><code>python tools/build_wordlists.py</code>'
+                + '</div>';
+            return;
+        }
+
+        const packs = data.wordlists || [];
+        if (packs.length === 0) {
+            list.innerHTML = '<div class="import-empty">词表目录是空的，先生成词表吧。</div>';
+            return;
+        }
+
+        list.innerHTML = '';
+
+        packs.forEach((pack) => {
+            const remain = Math.max(0, (pack.word_count || 0) - (pack.in_wordbook || 0));
+
+            const item = document.createElement('div');
+            item.className = 'import-item';
+
+            let meta = `${pack.word_count} 词`;
+            if (pack.in_wordbook > 0) {
+                meta += `　已在单词本 ${pack.in_wordbook} 词`;
+            }
+
+            item.innerHTML = `
+                <div class="import-item-main">
+                    <div class="import-item-name">${this.escapeHtml(pack.name)}</div>
+                    <div class="import-item-meta">${meta}</div>
+                </div>
+                <button type="button" class="import-item-btn">${remain > 0 ? '导入' : '已全部导入'}</button>
+            `;
+
+            const button = item.querySelector('.import-item-btn');
+            if (remain <= 0) {
+                button.disabled = true;
+                button.classList.add('is-done');
+            } else {
+                button.addEventListener('click', () => this.importWordlist(pack, button));
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    // 导入一册词书
+    async importWordlist(pack, button) {
+        if (!button || button.disabled) return;
+
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = '导入中…';
+
+        try {
+            const result = await this.api.importWordlist(pack.id);
+
+            await this.loadWordbook();
+
+            if (result.imported > 0) {
+                let message = `已导入「${pack.id}」${result.imported} 个单词`;
+                if (result.skipped > 0) {
+                    message += `，${result.skipped} 个之前就有`;
+                }
+                this.showNotification(message, 'success');
+            } else {
+                this.showNotification(`「${pack.id}」的单词都已经在单词本里了`, 'info');
+            }
+
+            // 重新拉一次列表，刷新「已在单词本 N 词」和按钮状态
+            const data = await this.api.getWordlists();
+            this.renderWordlistOptions(data);
+
+        } catch (err) {
+            console.error('导入词书失败:', err);
+            this.showNotification('导入失败：' + err.message, 'warning');
+            button.disabled = false;
+            button.textContent = originalText;
         }
     }
 
@@ -382,6 +572,39 @@ class WendyApp {
 
     // 设置事件监听器
     setupEventListeners() {
+        // 单词本：导入词书入口
+        const wordbookImportBtn = document.getElementById('wordbook-import-btn');
+        if (wordbookImportBtn) {
+            wordbookImportBtn.addEventListener('click', () => this.openImportDialog());
+        }
+
+        // 导入弹窗：关闭按钮 / 取消按钮 / 点遮罩空白处
+        const importCloseBtn = document.getElementById('import-close-btn');
+        if (importCloseBtn) {
+            importCloseBtn.addEventListener('click', () => this.closeImportDialog());
+        }
+        const importCancelBtn = document.getElementById('import-cancel-btn');
+        if (importCancelBtn) {
+            importCancelBtn.addEventListener('click', () => this.closeImportDialog());
+        }
+        const importOverlay = document.getElementById('import-overlay');
+        if (importOverlay) {
+            importOverlay.addEventListener('click', (e) => {
+                // 只有点到遮罩本身才关，点内容区不关
+                if (e.target === importOverlay) this.closeImportDialog();
+            });
+        }
+
+        // 单词本：按教材册次筛选
+        const sourceFilter = document.getElementById('wordbook-source-filter');
+        if (sourceFilter) {
+            sourceFilter.addEventListener('change', () => {
+                this.currentWordbookSource = sourceFilter.value;
+                this.currentPage = 1; // 换筛选后回到第一页
+                this.loadWordbook();
+            });
+        }
+
         // 翻译按钮
         const translateBtn = document.getElementById('translate-btn');
         if (translateBtn) {

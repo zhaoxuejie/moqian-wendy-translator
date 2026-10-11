@@ -50,6 +50,7 @@ from services.image_service import image_service
 from services.speech_service import speech_service
 from services.tts_service import tts_service
 from services.ocr_service import ocr_service
+from services.wordlist_service import wordlist_service
 from core.config import translation_config
 
 # ===== 目录解析 =====
@@ -72,6 +73,9 @@ def _resolve_dir(base_dir, name):
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 FRONTEND_DIR = _resolve_dir(BASE_DIR, 'frontend')
 DATABASE_DIR = _resolve_dir(BASE_DIR, 'database')
+# 教材词表目录（由 tools/build_wordlists.py 生成）。
+# 词表内容不进 Git（第三方数据无许可证），所以这个目录本地有、仓库里没有。
+WORDPACK_DIR = os.getenv('WORDPACK_DIR') or os.path.join(_resolve_dir(BASE_DIR, 'data'), 'wordlists')
 
 # 注意：这里刻意不设置 static_folder / static_url_path。
 # 之前写的是 Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')，
@@ -89,6 +93,9 @@ DATABASE = os.getenv('DATABASE_PATH', os.path.join(DATABASE_DIR, 'wendy_translat
 # Flask 会话签名密钥。应用当前未使用会话登录，所以不再写死固定值；
 # 如需启用会话，请通过环境变量 FLASK_SECRET_KEY 设置（这样服务重启后会话不会失效）。
 SECRET_KEY = os.getenv('FLASK_SECRET_KEY') or os.urandom(32).hex()
+
+# 教材词表：启动时扫描一次目录，把可用词书打印出来（导入功能用）
+wordlist_service.set_directory(WORDPACK_DIR)
 
 # 导入DeepSeek服务
 from services.deepseek_service import deepseek_service
@@ -387,21 +394,31 @@ def record_translation_history(username, original_text, translated_text, source_
         update_learning_progress(user['id'])
 
 # ====== 单词本管理 API ======
+# 前端筛选「手动添加的词」用的标记值。
+# 不能直接用空字符串，因为空字符串已经被用来表示「不筛选」了。
+SOURCE_FILTER_MANUAL = '__none__'
+
 @app.route('/api/wordbook', methods=['GET'])
 @handle_errors
 def get_wordbook():
-    """获取单词本"""
+    """获取单词本，可用 ?source= 按教材册次筛选"""
     username = request.args.get('username', 'wendy')
+    source = (request.args.get('source') or '').strip()
     
     user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
     if not user:
         return jsonify({'success': False, 'error': '用户不存在'}), 404
     
-    words = query_db('''
-        SELECT * FROM wordbook 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC
-    ''', (user['id'],))
+    sql = 'SELECT * FROM wordbook WHERE user_id = ?'
+    params = [user['id']]
+    if source == SOURCE_FILTER_MANUAL:
+        sql += " AND (source IS NULL OR source = '')"
+    elif source:
+        sql += ' AND source = ?'
+        params.append(source)
+    sql += ' ORDER BY created_at DESC'
+    
+    words = query_db(sql, tuple(params)) or []
     
     word_list = []
     for word in words:
@@ -415,13 +432,148 @@ def get_wordbook():
             'word_image': word['word_image'],
             'mastery_level': word['mastery_level'],
             'review_count': word['review_count'],
-            'last_reviewed': word['last_reviewed']
+            'last_reviewed': word['last_reviewed'],
+            'source': word['source'] or ''
         })
+    
+    # 返回当前单词本里已有的来源清单及各自词数，供前端渲染筛选下拉。
+    # 不改动上面的筛选结果，所以即使正在按册筛选也能拿到完整清单。
+    source_rows = query_db('''
+        SELECT source, COUNT(*) AS cnt
+        FROM wordbook
+        WHERE user_id = ?
+        GROUP BY source
+        ORDER BY source
+    ''', (user['id'],)) or []
+    sources = [
+        {'source': row['source'] or '', 'count': row['cnt']}
+        for row in source_rows
+    ]
     
     return jsonify({
         'success': True,
         'words': word_list,
-        'total': len(word_list)
+        'total': len(word_list),
+        'sources': sources
+    })
+
+# ====== 教材词书（导入单词本） ======
+@app.route('/api/wordlists', methods=['GET'])
+@handle_errors
+def list_wordlists():
+    """
+    列出 data/wordlists/ 里可导入的教材词书。
+
+    in_wordbook 表示这本词书里已经有多少词在这个用户的单词本里了，
+    方便界面显示「已导入 12 / 392」，也解释了为什么导入后词数比册次总数少
+    —— 不同册之间会有重复的单词（比如 hello、good），
+    这些词在第一次导入时就进去了，会保留最初那册的来源标记。
+    """
+    username = request.args.get('username', 'wendy')
+
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+
+    packs = wordlist_service.list_packs()
+
+    existing = query_db(
+        'SELECT english_word FROM wordbook WHERE user_id = ?', (user['id'],)
+    ) or []
+    owned = {(row['english_word'] or '').strip().lower() for row in existing}
+
+    result = []
+    for pack in packs:
+        records = wordlist_service.read_pack(pack['id']) or []
+        already = sum(1 for r in records if r['english_word'].lower() in owned)
+        result.append({
+            'id': pack['id'],
+            'name': pack['name'],
+            'word_count': pack['word_count'],
+            'in_wordbook': already
+        })
+
+    return jsonify({
+        'success': True,
+        'available': wordlist_service.available(),
+        'directory': wordlist_service.directory or '',
+        'wordlists': result
+    })
+
+@app.route('/api/wordbook/import', methods=['POST'])
+@handle_errors
+def import_wordlist():
+    """
+    把一册教材词表整册导入单词本。
+
+    - 已存在的单词会被自动跳过（wordbook 上有 UNIQUE(user_id, english_word)），
+      所以同一册重复导入是安全的，不会产生重复词
+    - source 记录来源册次，导入后可按册筛选
+    """
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', 'wendy')
+    pack_id = (data.get('source') or data.get('id') or '').strip()
+
+    user = query_db('SELECT id FROM users WHERE username = ?', (username,), one=True)
+    if not user:
+        return jsonify({'success': False, 'error': '用户不存在'}), 404
+
+    if not pack_id:
+        return jsonify({'success': False, 'error': '缺少 source 参数'}), 400
+
+    # read_pack 只接受目录里真实存在的 ID，不接受任意路径，因此没有路径穿越风险
+    records = wordlist_service.read_pack(pack_id)
+    if records is None:
+        return jsonify({
+            'success': False,
+            'error': '找不到这本词书：%s（请确认 data/wordlists/ 里有对应 CSV）' % pack_id
+        }), 404
+    if not records:
+        return jsonify({'success': False, 'error': '这本词书是空的'}), 400
+
+    conn = get_db()
+    try:
+        before = conn.execute(
+            'SELECT COUNT(*) FROM wordbook WHERE user_id = ?', (user['id'],)
+        ).fetchone()[0]
+
+        conn.executemany('''
+            INSERT OR IGNORE INTO wordbook
+                (user_id, english_word, chinese_meaning, pronunciation,
+                 example_sentence, example_translation, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', [
+            (
+                user['id'],
+                r['english_word'],
+                r['chinese_meaning'],
+                r.get('pronunciation') or '',
+                r.get('example_sentence') or '',
+                r.get('example_translation') or '',
+                pack_id
+            )
+            for r in records
+        ])
+        conn.commit()
+
+        after = conn.execute(
+            'SELECT COUNT(*) FROM wordbook WHERE user_id = ?', (user['id'],)
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    imported = after - before
+    skipped = len(records) - imported
+
+    print('📚 导入词书「%s」: 新增 %d 词，跳过 %d 词（已存在）'
+          % (pack_id, imported, skipped))
+
+    return jsonify({
+        'success': True,
+        'source': pack_id,
+        'imported': imported,
+        'skipped': skipped,
+        'total': len(records)
     })
 
 @app.route('/api/wordbook', methods=['POST'])

@@ -182,6 +182,17 @@
             </div>
             
             <div class="tab-content" id="wordbook-tab">
+                <div class="wordbook-toolbar">
+                    <select class="wordbook-source-filter" id="wordbook-source-filter"
+                            aria-label="按教材筛选单词">
+                        <option value="">全部单词</option>
+                    </select>
+                    <button type="button" class="wordbook-import-btn" id="wordbook-import-btn">
+                        <i class="fas fa-book-medical"></i>
+                        <span id="wordbook-import-text">导入词书</span>
+                    </button>
+                </div>
+
                 <div class="wordbook" id="wordbook-container">
                     <!-- 单词将通过JavaScript动态生成 -->
                 </div>
@@ -344,6 +355,25 @@
             <div class="confirm-actions">
                 <button type="button" class="confirm-btn confirm-cancel" id="confirm-cancel-btn">取消</button>
                 <button type="button" class="confirm-btn confirm-ok confirm-danger" id="confirm-ok-btn">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入教材词书弹窗 -->
+    <div class="import-overlay" id="import-overlay">
+        <div class="import-box">
+            <div class="import-header">
+                <h3 class="import-title"><i class="fas fa-book-medical"></i> 导入教材词书</h3>
+                <button type="button" class="import-close" id="import-close-btn" aria-label="关闭">&times;</button>
+            </div>
+            <p class="import-hint" id="import-hint">
+                选一本教材，一次把这册的单词全部加进单词本。已经在单词本里的词会自动跳过，重复导入不会产生重复。
+            </p>
+            <div class="import-list" id="import-list">
+                <div class="import-empty">正在读取词书…</div>
+            </div>
+            <div class="import-actions">
+                <button type="button" class="confirm-btn confirm-cancel" id="import-cancel-btn">关闭</button>
             </div>
         </div>
     </div>

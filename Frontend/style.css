@@ -1362,6 +1362,221 @@ body {
     100% { transform: scale(1); opacity: 1; }
 }
 
+/* ==================== 单词本工具栏（导入词书 / 按册筛选） ==================== */
+
+.wordbook-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.wordbook-source-filter {
+    flex: 1;
+    min-width: 0;
+    border: 2px solid var(--secondary);
+    border-radius: 12px;
+    background: white;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px 10px;
+    cursor: pointer;
+    outline: none;
+}
+
+.wordbook-source-filter:focus {
+    border-color: var(--primary);
+}
+
+.wordbook-import-btn {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    color: white;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.wordbook-import-btn i {
+    margin-right: 5px;
+}
+
+.wordbook-import-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 158, 201, 0.45);
+}
+
+.wordbook-import-btn:active {
+    transform: translateY(0);
+}
+
+/* ==================== 导入教材词书弹窗 ==================== */
+
+.import-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1210;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.import-overlay.show {
+    display: flex;
+    animation: confirmFadeIn 0.2s ease;
+}
+
+.import-box {
+    background: white;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 380px;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    animation: confirmPopIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.import-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 18px 0;
+}
+
+.import-title {
+    margin: 0;
+    font-size: 16px;
+    color: var(--primary);
+}
+
+.import-title i {
+    margin-right: 6px;
+}
+
+.import-close {
+    border: none;
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    color: #bbb;
+    cursor: pointer;
+    padding: 0 2px;
+    font-family: inherit;
+}
+
+.import-close:hover {
+    color: var(--primary);
+}
+
+.import-hint {
+    margin: 8px 18px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #999;
+}
+
+.import-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.import-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    background: var(--secondary);
+    margin-bottom: 8px;
+}
+
+.import-item-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.import-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+}
+
+.import-item-meta {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #999;
+}
+
+.import-item-btn {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    color: white;
+    background: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.import-item-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+
+.import-item-btn:disabled {
+    cursor: default;
+}
+
+.import-item-btn.is-done {
+    background: #d8d8d8;
+    color: #888;
+}
+
+.import-empty {
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 24px 10px;
+}
+
+.import-empty code {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--secondary);
+    color: var(--primary);
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.import-actions {
+    display: flex;
+    padding: 12px 18px 16px;
+}
+
 @keyframes wordDetailPopIn {
     0% { transform: scale(0.9); opacity: 0; }
     70% { transform: scale(1.02); }

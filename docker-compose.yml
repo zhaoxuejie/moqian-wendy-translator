@@ -13,6 +13,10 @@ services:
       # 手机可以直接打开 http://<电脑IP>:5000/wendy-rootCA.crt 下载安装，
       # 省掉微信传文件的麻烦。注意只挂 .crt，绝不要挂整个 certs/ 目录。
       - ./certs/wendy-rootCA.crt:/app/frontend/wendy-rootCA.crt:ro
+      # 教材词表（只读）。词表内容不进 Git，放在宿主机 data/wordlists/，
+      # 容器里挂到 /app/data 供「导入词书」功能读取。
+      # 目录不存在时 Docker 会建一个空目录，应用只会提示词表目录为空，不会崩。
+      - ./data:/app/data:ro
       # 可选：如果需要热更新前端文件
       # - ./frontend:/app/frontend:ro
     environment:
