@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 # 导入服务
 from services.translation_service import translation_service
 from services.speech_service import speech_service
+from services.tts_service import tts_service
 from services.ocr_service import ocr_service
 
 class TranslationConfig:
@@ -104,25 +105,30 @@ class TranslationConfig:
                 print("ℹ️  未检测到翻译API配置，将使用模拟翻译")
     
     def _load_speech_config(self):
-        """加载百度语音识别API配置"""
+        """加载百度语音识别 / 语音合成API配置（两者共用同一套凭证）"""
         env_app_id = os.getenv('BAIDU_SPEECH_APP_ID')
         env_api_key = os.getenv('BAIDU_SPEECH_API_KEY')
         env_secret_key = os.getenv('BAIDU_SPEECH_SECRET_KEY')
         
         if env_api_key and env_secret_key:
-            speech_service.set_config(env_app_id or '', env_api_key, env_secret_key)
-            print("✅ 百度语音识别API已配置（从环境变量）")
-        else:
-            # 尝试从配置文件读取
-            try:
-                from services.configure_baidu_speech_api import BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY
-                if BAIDU_SPEECH_API_KEY and BAIDU_SPEECH_SECRET_KEY:
-                    speech_service.set_config(BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY)
-                    print("✅ 百度语音识别API已配置（从配置文件）")
-            except ImportError:
-                pass
-            except Exception as e:
-                print(f"⚠️  百度语音识别API配置失败: {e}")
+            self._apply_speech_config(env_app_id or '', env_api_key, env_secret_key, '环境变量')
+            return
+        
+        # 尝试从配置文件读取
+        try:
+            from services.configure_baidu_speech_api import BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY
+            if BAIDU_SPEECH_API_KEY and BAIDU_SPEECH_SECRET_KEY:
+                self._apply_speech_config(BAIDU_SPEECH_APP_ID, BAIDU_SPEECH_API_KEY, BAIDU_SPEECH_SECRET_KEY, '配置文件')
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"⚠️  百度语音API配置失败: {e}")
+    
+    def _apply_speech_config(self, app_id, api_key, secret_key, source):
+        """语音识别与语音合成用的都是百度语音技术，同一套凭证"""
+        speech_service.set_config(app_id, api_key, secret_key)
+        tts_service.set_config(app_id, api_key, secret_key)
+        print(f"✅ 百度语音识别 + 语音合成API已配置（从{source}）")
     
     def _load_ocr_config(self):
         """加载百度OCR API配置"""

@@ -65,12 +65,20 @@ Backend/database/*.sqlite3
 database/*.db
 database/*.sqlite
 database/*.sqlite3
+# 语音合成的磁盘缓存（自动生成的音频，重新朗读时会自动重建）
+database/tts_cache/
 
 # 环境变量和配置文件（包含敏感信息）
 .env
 .env.local
 *.key
 *.pem
+
+# 本地 HTTPS 自签证书（certs/ 里有 CA 私钥，能签发任意证书，绝不能提交）
+# 用 certs/* 而不是 certs/ —— 这样才能把说明文档单独放行，
+# 因为 git 无法反悔一个"整个目录被忽略"的规则
+certs/*
+!certs/README.md
 
 # IDE 和编辑器
 .vscode/

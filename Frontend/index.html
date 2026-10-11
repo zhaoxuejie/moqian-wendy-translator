@@ -663,5 +663,33 @@
             <div id="game-container"></div>
         </div>
     </div>
+
+    <!-- Service Worker 注册（PWA：可安装到桌面 + 离线可用）
+         注意：Service Worker 只能在"安全上下文"注册 ——
+           ✅ https://...          可以
+           ✅ http://localhost:5000 可以（浏览器特批）
+           ❌ http://192.168.x.x:5000 不行（纯 HTTP 的局域网地址会被拒绝）
+         注册失败不影响任何页面功能，只是没有离线和安装能力。 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js').then(function (reg) {
+                    console.log('✅ Service Worker 已注册，作用域：' + reg.scope);
+                    // 有新版本时提示刷新
+                    reg.addEventListener('updatefound', function () {
+                        var sw = reg.installing;
+                        if (!sw) return;
+                        sw.addEventListener('statechange', function () {
+                            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('ℹ️ 检测到新版本，刷新页面即可生效');
+                            }
+                        });
+                    });
+                }).catch(function (err) {
+                    console.warn('⚠️ Service Worker 注册失败（页面功能不受影响）：' + err.message);
+                });
+            });
+        }
+    </script>
 </body>
 </html>

@@ -27,7 +27,7 @@ except:
     import os
     os.environ['PYTHONUNBUFFERED'] = '1'
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import sqlite3
 import os
@@ -48,6 +48,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.translation_service import translation_service
 from services.image_service import image_service
 from services.speech_service import speech_service
+from services.tts_service import tts_service
 from services.ocr_service import ocr_service
 from core.config import translation_config
 
@@ -72,7 +73,13 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 FRONTEND_DIR = _resolve_dir(BASE_DIR, 'frontend')
 DATABASE_DIR = _resolve_dir(BASE_DIR, 'database')
 
-app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')
+# 注意：这里刻意不设置 static_folder / static_url_path。
+# 之前写的是 Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')，
+# 那会让 Flask 自动注册一条 /<path:filename> 静态路由，把下面手写的
+# static_files() 完全遮蔽掉（url_map 里两条规则同名，内置那条先注册、先匹配）。
+# 后果：BASE_DIR 回退分支从未执行，也无法为 sw.js 单独设置响应头。
+# 现在统一交给 static_files() 处理，实际行为与之前一致，但逻辑不再失效。
+app = Flask(__name__, static_folder=None)
 CORS(app)  # 允许跨域请求
 
 # 配置
@@ -172,7 +179,12 @@ def static_files(filename):
     # 首先尝试从 frontend 目录提供文件（绝对路径，不依赖当前工作目录）
     frontend_path = os.path.join(FRONTEND_DIR, filename)
     if os.path.exists(frontend_path):
-        return send_from_directory(FRONTEND_DIR, filename)
+        response = send_from_directory(FRONTEND_DIR, filename)
+        # Service Worker 脚本必须禁止缓存，否则它会一直用旧的，
+        # 前端更新后用户要等很久甚至永远拿不到新版本
+        if filename == 'sw.js':
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
 
     # 然后尝试从项目根目录提供文件
     root_path = os.path.join(BASE_DIR, filename)
@@ -822,6 +834,60 @@ def recognize_speech():
             'success': False,
             'error': f'服务异常: {str(e)}'
         }), 500
+
+# ====== 语音合成 API ======
+@app.route('/api/speech/tts', methods=['POST'])
+def synthesize_speech():
+    """
+    语音合成接口，成功时直接返回 MP3 音频。
+
+    为什么需要：浏览器的 Web Speech API 依赖系统 TTS 引擎。
+    华为浏览器等国产浏览器往往没有可用引擎，getVoices() 返回空数组，
+    speechSynthesis.speak() 会静默失败（不报错也不出声）。
+    这时前端改用这个接口拿到 MP3 再播放，就能绕开浏览器差异。
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        text = (data.get('text') or '').strip()
+        if not text:
+            return jsonify({'success': False, 'error': '缺少 text 参数'}), 400
+
+        lang = data.get('lang', 'zh')
+        rate = data.get('rate', 1.0)
+        per = data.get('per', 0)
+
+        if not tts_service.is_configured():
+            return jsonify({
+                'success': False,
+                'error': '未配置百度语音合成，请在 .env 里设置 BAIDU_SPEECH_API_KEY 与 BAIDU_SPEECH_SECRET_KEY'
+            }), 503
+
+        print(f"🔊 收到语音合成请求: lang={lang} rate={rate} per={per} 文本长度={len(text)}")
+        audio, mime = tts_service.synthesize(text, lang=lang, rate=rate, per=per)
+        print(f"✅ 语音合成完成: {len(audio)} 字节")
+
+        # 音频内容由文本+参数唯一决定，交给浏览器缓存一天，省百度额度
+        resp = Response(audio, mimetype=mime)
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
+        return resp
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        print(f"💥 语音合成API异常: {type(e).__name__}: {e}")
+        return jsonify({'success': False, 'error': f'语音合成失败: {str(e)}'}), 500
+
+@app.route('/api/speech/tts/stats', methods=['GET'])
+def tts_stats():
+    """
+    语音合成的缓存与用量统计。
+
+    baidu_calls 是**真正消耗百度免费额度**的次数，
+    可以随时打开这个地址确认缓存有没有在省额度。
+    """
+    info = tts_service.cache_info()
+    info['configured'] = tts_service.is_configured()
+    return jsonify(info)
 
 # ====== OCR文字识别 API ======
 @app.route('/api/ocr/recognize', methods=['POST'])

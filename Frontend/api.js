@@ -132,7 +132,7 @@ class WendyAPI {
         formData.append('language', language);
         formData.append('accurate', accurate.toString());
         
-        const response = await fetch('/api/ocr/recognize', {
+        const response = await fetch(`${this.baseURL}/api/ocr/recognize`, {
             method: 'POST',
             body: formData
         });
@@ -169,8 +169,25 @@ class WendyAPI {
     }
 }
 
+// 解析后端地址，优先级从高到低：
+//   1) window.WENDY_API_BASE —— 手动覆盖。前端与后端不同源时使用
+//      （例如套壳 App、或把前端单独托管、后端放服务器）
+//   2) 页面自身的 origin —— 同源部署。本机、局域网手机、Docker 都走这条。
+//      之前这里写死 http://localhost:5000，手机打开局域网地址后，
+//      所有请求都会打到手机自己的 localhost，表现为"页面能显示但功能全部失效"
+//   3) http://localhost:5000 —— 用 file:// 直接打开 html 时的回退
+function resolveApiBaseURL() {
+    if (window.WENDY_API_BASE) {
+        return String(window.WENDY_API_BASE).replace(/\/+$/, '');
+    }
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        return window.location.origin;
+    }
+    return 'http://localhost:5000';
+}
+
 // 创建全局API实例
-const wendyAPI = new WendyAPI();
+const wendyAPI = new WendyAPI(resolveApiBaseURL());
 
 // 前端应用管理器
 class WendyApp {
@@ -183,6 +200,16 @@ class WendyApp {
         this.selectedVoiceName = ''; // 用户选择的语音名称
         this.selectedVoiceLang = ''; // 用户选择的语音语言
         this.availableVoices = []; // 可用的语音列表
+        this.currentAudio = null; // 后端合成时正在播放的 <audio> 元素
+        // 后端语音合成的发音人（百度基础版）。
+        // 浏览器没有系统 TTS 引擎时，用这些填充「语音设置」面板，
+        // 否则面板只会显示「暂无中文语音」，用户根本没得选。
+        this.backendVoices = [
+            { name: 'baidu:0', nickname: '小美', per: 0 },
+            { name: 'baidu:1', nickname: '小宇', per: 1 },
+            { name: 'baidu:3', nickname: '逍遥', per: 3 },
+            { name: 'baidu:4', nickname: '丫丫', per: 4 }
+        ];
         this.currentGamePage = 1; // 游戏卡片当前页码
         this.currentGameType = 'word-challenge'; // 当前选中的游戏类型
         this.wordChallengeGame = null; // 单词挑战游戏实例
@@ -962,14 +989,112 @@ class WendyApp {
         return utterance;
     }
 
-    speakWord(word) {
-        if (!('speechSynthesis' in window)) {
-            this.showNotification('您的浏览器不支持语音朗读', 'warning');
-            return;
+    // ==================== 语音朗读 ====================
+    // 设计：优先用浏览器自带的 Web Speech API（不耗额度、延迟低、能离线），
+    // 只有它「真的不可用」时才回退到后端百度合成。
+    //
+    // 特别注意：'speechSynthesis' in window 为 true 并不代表能用。
+    // 华为浏览器这类没有系统 TTS 引擎的环境，getVoices() 返回空数组，
+    // 此时 speak() 会**静默失败** —— 不抛异常、也不出声，极难排查。
+    // 所以可用性必须用「语音列表是否为空」来判断，不能只看接口存在。
+
+    nativeTTSAvailable() {
+        if (!('speechSynthesis' in window)) return false;
+        const voices = speechSynthesis.getVoices();
+        return !!(voices && voices.length > 0);
+    }
+
+    // 音量跟随「语音设置」里的音量滑块，和 createUtterance 保持一致
+    currentVolume() {
+        const slider = document.getElementById('volume-slider');
+        return slider ? slider.value / 100 : 0.5;
+    }
+
+    // 后端发音人：用户在「语音设置」里选的是 baidu:N 就用 N
+    resolveBackendSpeaker() {
+        const name = String(this.selectedVoiceName || '');
+        if (name.indexOf('baidu:') === 0) {
+            const per = parseInt(name.split(':')[1], 10);
+            if (!isNaN(per)) return per;
         }
-        // 单词朗读放慢一点，方便跟读
+        return 0; // 默认度小美
+    }
+
+    // 后端合成兜底：拿 MP3 用 <audio> 播放，任何浏览器都能播
+    async speakViaBackend(text, { rate = 1.0, lang } = {}) {
+        const hasChinese = /[\u4e00-\u9fff]/.test(text || '');
+        const targetLang = lang || (hasChinese ? 'zh' : 'en');
+        const base = (this.api && this.api.baseURL) || wendyAPI.baseURL;
+
         this.stopSpeaking();
-        speechSynthesis.speak(this.createUtterance(word, { rate: 0.8 }));
+
+        const response = await fetch(`${base}/api/speech/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: text,
+                lang: targetLang,
+                rate: rate,
+                per: this.resolveBackendSpeaker()
+            })
+        });
+
+        if (!response.ok) {
+            let message = `HTTP ${response.status}`;
+            try {
+                const data = await response.json();
+                if (data && data.error) message = data.error;
+            } catch (e) { /* 返回不是 JSON，保留默认信息 */ }
+            throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const audio = new Audio(objectUrl);
+        audio.volume = this.currentVolume();
+        this.currentAudio = audio;
+
+        const cleanup = () => {
+            URL.revokeObjectURL(objectUrl);
+            if (this.currentAudio === audio) this.currentAudio = null;
+        };
+        audio.addEventListener('ended', cleanup);
+        audio.addEventListener('error', cleanup);
+
+        await audio.play();
+    }
+
+    // 统一的朗读入口，所有朗读都走这里，保证行为一致
+    async speak(text, { rate = 1.0, lang } = {}) {
+        const content = (text === null || text === undefined) ? '' : String(text).trim();
+        if (!content) return;
+
+        // 1) 浏览器自带合成：优先（不耗额度、延迟低、能离线）
+        if (this.nativeTTSAvailable()) {
+            try {
+                this.stopSpeaking();
+                speechSynthesis.speak(this.createUtterance(content, { rate: rate, lang: lang }));
+                return;
+            } catch (err) {
+                // 有些浏览器的语音实现是残缺的：接口都在、也能报出语音列表，
+                // 但一赋值就抛异常。这里不能就此放弃，继续走下面的后端兜底。
+                console.warn('浏览器自带语音合成失败，改用后端合成:', err);
+            }
+        }
+
+        // 2) 没有可用引擎，回退到后端合成
+        try {
+            await this.speakViaBackend(content, { rate: rate, lang: lang });
+        } catch (err) {
+            console.error('语音朗读失败:', err);
+            this.showNotification('语音朗读失败：' + err.message, 'warning');
+        }
+    }
+
+    speakWord(word) {
+        if (!word) return;
+        // 单词朗读放慢一点，方便跟读
+        this.speak(word, { rate: 0.8 });
     }
 
     // 更新单词掌握程度
@@ -1280,20 +1405,13 @@ class WendyApp {
         }
     }
     
-    // 语音朗读（使用Web Speech API）
+    // 语音朗读
     speakText(text) {
         if (!text) {
             this.showNotification('没有可朗读的文本', 'warning');
             return;
         }
-        
-        if (!('speechSynthesis' in window)) {
-            this.showNotification('您的浏览器不支持语音朗读', 'warning');
-            return;
-        }
-        
-        this.stopSpeaking();
-        speechSynthesis.speak(this.createUtterance(text));
+        this.speak(text);
     }
     
     // 从HTML中提取纯文本（用于语音朗读）
@@ -1323,10 +1441,16 @@ class WendyApp {
         return text;
     }
     
-    // 停止当前语音播放
+    // 停止当前语音播放（浏览器自带朗读和后端音频都要停）
     stopSpeaking() {
         if ('speechSynthesis' in window) {
             speechSynthesis.cancel();
+        }
+        if (this.currentAudio) {
+            try {
+                this.currentAudio.pause();
+            } catch (e) { /* 已经停了，忽略 */ }
+            this.currentAudio = null;
         }
     }
     
@@ -1336,9 +1460,6 @@ class WendyApp {
             this.showNotification('没有可朗读的内容', 'warning');
             return;
         }
-        
-        // 停止之前的播放
-        this.stopSpeaking();
         
         // 如果内容是HTML格式（Markdown转换后的），提取纯文本
         let textToSpeak = content;
@@ -1351,22 +1472,9 @@ class WendyApp {
             return;
         }
         
-        if (!('speechSynthesis' in window)) {
-            this.showNotification('您的浏览器不支持语音朗读', 'warning');
-            return;
-        }
-        
-        // 语音、音量、语言统一交给 createUtterance，确保和「语音设置」保持一致
-        const utterance = this.createUtterance(textToSpeak, { rate: 0.9 });
-        utterance.onerror = (event) => {
-            console.error('语音朗读错误:', event);
-            this.showNotification('语音朗读失败', 'warning');
-        };
-        utterance.onend = () => {
-            console.log('语音朗读完成');
-        };
-        
-        speechSynthesis.speak(utterance);
+        // 语音、音量、语言统一走 speak（浏览器自带或后端合成自动选择），
+        // 确保和「语音设置」保持一致
+        this.speak(textToSpeak, { rate: 0.9 });
     }
 
     setupVoiceInputButtons() {
@@ -1518,7 +1626,7 @@ class WendyApp {
                     
                     this.showNotification('正在识别...', 'info');
                     
-                    const response = await fetch('/api/speech/recognize', {
+                    const response = await fetch(`${wendyAPI.baseURL}/api/speech/recognize`, {
                         method: 'POST',
                         body: formData
                     });
@@ -1734,7 +1842,7 @@ class WendyApp {
                 formData.append('accurate', 'false'); // 使用标准版（免费额度更多）
                 
                 // 发送到后端识别
-                const response = await fetch('/api/ocr/recognize', {
+                const response = await fetch(`${wendyAPI.baseURL}/api/ocr/recognize`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1779,6 +1887,8 @@ class WendyApp {
     // 初始化语音列表
     initVoices() {
         if (!('speechSynthesis' in window)) {
+            // 连接口都没有：直接用后端发音人填充面板
+            this.renderVoiceOptions();
             return;
         }
         
@@ -1850,13 +1960,40 @@ class WendyApp {
             englishVoicesContainer.appendChild(option);
         });
         
-        // 如果没有语音，显示提示
-        if (chineseVoices.length === 0) {
+        // 浏览器没有可用的系统 TTS 引擎时（华为浏览器等），
+        // 换用后端百度合成的发音人，否则面板只会显示「暂无语音」，用户根本没得选。
+        if (!this.nativeTTSAvailable() && this.backendVoices.length > 0) {
+            if (chineseVoices.length === 0) this.renderBackendVoiceOptions(chineseVoicesContainer, 'zh');
+            if (englishVoices.length === 0) this.renderBackendVoiceOptions(englishVoicesContainer, 'en');
+        }
+        
+        // 还是没有才显示提示
+        if (!chineseVoicesContainer.innerHTML.trim()) {
             chineseVoicesContainer.innerHTML = '<div class="voice-empty">暂无中文语音</div>';
         }
-        if (englishVoices.length === 0) {
+        if (!englishVoicesContainer.innerHTML.trim()) {
             englishVoicesContainer.innerHTML = '<div class="voice-empty">暂无英文语音</div>';
         }
+    }
+    
+    // 渲染「后端语音合成」的发音人选项。
+    // 这些发音人走服务端合成，中英文都支持，所以两栏都能用。
+    renderBackendVoiceOptions(container, lang) {
+        this.backendVoices.forEach((voice) => {
+            const option = document.createElement('div');
+            option.className = 'voice-option';
+            if (this.selectedVoiceName === voice.name) {
+                option.classList.add('active');
+            }
+            option.textContent = voice.nickname;
+            option.title = '百度语音合成 · ' + voice.nickname;
+            option.setAttribute('data-voice-name', voice.name);
+            option.setAttribute('data-voice-lang', lang);
+            option.addEventListener('click', () => {
+                this.selectVoice(voice.name, lang);
+            });
+            container.appendChild(option);
+        });
     }
     
     // 切换语音选项显示

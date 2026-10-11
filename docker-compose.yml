@@ -9,6 +9,10 @@ services:
     volumes:
       # 持久化数据库文件
       - ./database:/app/database
+      # 根证书（公开文件，不是私钥）映射进前端目录，
+      # 手机可以直接打开 http://<电脑IP>:5000/wendy-rootCA.crt 下载安装，
+      # 省掉微信传文件的麻烦。注意只挂 .crt，绝不要挂整个 certs/ 目录。
+      - ./certs/wendy-rootCA.crt:/app/frontend/wendy-rootCA.crt:ro
       # 可选：如果需要热更新前端文件
       # - ./frontend:/app/frontend:ro
     environment:
@@ -51,6 +55,34 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - wendy-network
+
+  # ===== HTTPS 前端（给手机用）=====
+  # 局域网手机通过 https://<电脑IP>:5443 访问，证书由 certs/ 里的本地 CA 签发。
+  # 为什么要这个：Service Worker / 安装成 App 要求安全上下文，
+  #   纯 HTTP 的局域网 IP 会被浏览器拒绝，只有 HTTPS 或 localhost 才行。
+  # 电脑端继续用 http://localhost:5000，两者互不影响。
+  #
+  # 手机需先安装 certs/wendy-rootCA.crt 根证书（一次性）。
+  # 换电脑 IP、或证书过期后，重新生成证书即可，见 certs/README.md。
+  wendy-https:
+    image: nginx:alpine
+    container_name: wendy-https
+    depends_on:
+      - wendy-translator
+    ports:
+      - "5443:443"
+    volumes:
+      - ./Config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O /dev/null https://127.0.0.1/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - wendy-network
 
