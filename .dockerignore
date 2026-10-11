@@ -54,7 +54,6 @@ Report/
 *.md
 
 # 测试文件
-Backend/tests/
 *.test.py
 *_test.py
 
@@ -63,6 +62,8 @@ start.bat
 start.sh
 
 # 配置文件（敏感信息，通过环境变量传递）
+.env
+.env.local
 Backend/services/configure_*.py
 Backend/services/deepseek_config.json
 

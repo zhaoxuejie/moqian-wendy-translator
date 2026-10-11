@@ -100,13 +100,8 @@ wendy-translator/
 │   │   ├── configure_baidu_speech_api.py # 百度语音API配置
 │   │   ├── configure_baidu_ocr_api.py # 百度OCR API配置
 │   │   └── deepseek_config.json # DeepSeek配置文件
-│   ├── utils/               # 工具函数
-│   │   ├── fix_translation.py # 翻译修复工具
-│   │   └── setup_translation_api.py # API设置工具
-│   └── tests/               # 测试文件
-│       ├── test_api.py      # API测试
-│       ├── test_translation_logs.py # 翻译日志测试
-│       └── test_*.py        # 其他测试文件
+│   └── utils/               # 工具函数
+│       └── setup_translation_api.py # API设置工具
 ├── ⚙️ config/                # 配置与启动
 │   ├── requirements.txt     # Python依赖
 │   └── start_app.py         # 启动脚本
@@ -548,16 +543,11 @@ await wendyApp.handleAddToWordbook();
 
 ## 🧪 测试和调试
 
-### 测试文件
-项目包含测试文件用于功能验证：
-
-- `backend/tests/test_api.py` - 后端API测试
-
 ### 调试指南
 1. **前端调试**：打开浏览器开发者工具查看控制台日志
 2. **后端调试**：查看Flask服务器的控制台输出
 3. **数据库调试**：使用SQLite工具查看 `database/wendy_translator.db`
-4. **API调试**：查看 `backend/tests/` 目录下的测试用例
+4. **API调试**：访问 `http://localhost:5000/api/health` 检查服务状态，或直接用 curl / Postman 调用各接口
 
 ### 性能优化
 - 翻译结果缓存提升响应速度
