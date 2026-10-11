@@ -7,31 +7,6 @@
 
 ---
 
-## 为什么要单独放、不进仓库
-
-这些教材词表来自第三方整理，**没有开源许可证**：
-
-| 来源 | Stars | 许可证 |
-|---|---:|---|
-| [kajweb/dict](https://github.com/kajweb/dict) | 3673 | ❌ 无 |
-| [SteveSuv/remix-words-funny](https://github.com/SteveSuv/remix-words-funny) | 1575 | ❌ 无 |
-| [lizliz404/pep-words](https://github.com/lizliz404/pep-words) | 1 | ❌ 无 |
-
-而且从数据格式（`wordRank` / `ukphone` / `remMethod`）看，来源很可能是商业词库。
-
-**风险分层：**
-
-| 用法 | 风险 |
-|---|---|
-| 自己电脑上给孩子用 | 🟢 基本为零 |
-| 打包进公开的 GitHub 仓库 | 🟡 等于公开分发，有被投诉的可能 |
-| 商业 / 教学用途 | 🔴 不建议 |
-
-所以本项目的做法是：**功能进仓库，数据不进仓库**。
-导入功能是公开代码，词表文件留在你自己电脑上。
-
----
-
 ## 生成词表
 
 仓库里带了转换脚本，直接跑就行：
