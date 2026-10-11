@@ -772,15 +772,27 @@ def recognize_speech():
         language = request.form.get('language', 'en')  # 默认英文
         format_type = request.form.get('format', 'wav')  # 默认wav
         rate = int(request.form.get('rate', 16000))  # 默认16kHz
+        # 客户端实测录音时长（毫秒），仅用于排查问题；未传则为 None
+        try:
+            duration_ms = int(request.form.get('duration_ms')) if request.form.get('duration_ms') else None
+        except (TypeError, ValueError):
+            duration_ms = None
         
         # 读取音频数据
         audio_data = audio_file.read()
+        
+        # WAV 头 44 字节；16kHz/16bit/单声道 每秒 32000 字节
+        est_seconds = max(0.0, (len(audio_data) - 44) / 32000.0)
         
         print(f"📋 请求参数:")
         print(f"   - 语言: {language}")
         print(f"   - 格式: {format_type}")
         print(f"   - 采样率: {rate}")
-        print(f"   - 音频大小: {len(audio_data)} 字节")
+        print(f"   - 音频大小: {len(audio_data)} 字节 (约 {est_seconds:.2f} 秒)")
+        if duration_ms is not None:
+            print(f"   - 客户端录音时长: {duration_ms} ms")
+        if est_seconds < 0.5:
+            print(f"   ⚠️  音频过短（{est_seconds:.2f} 秒），百度会判为无效并返回 3307/3310")
         
         # 调用语音识别服务
         result = speech_service.recognize_audio(

@@ -328,6 +328,20 @@
         <p id="congratulation-text">温蒂，你太棒了！已经记住了这个单词！</p>
     </div>
 
+    <!-- 通用确认弹窗 -->
+    <div class="confirm-overlay" id="confirm-overlay">
+        <div class="confirm-box">
+            <div class="confirm-icon"><i class="fas fa-trash-alt"></i></div>
+            <h3 class="confirm-title" id="confirm-title">删除单词</h3>
+            <p class="confirm-text" id="confirm-text"
+               data-template="确定要把「{word}」从单词本中删除吗？删除后该单词的星级和复习记录也会一并清除。">确定要把这个单词从单词本中删除吗？</p>
+            <div class="confirm-actions">
+                <button type="button" class="confirm-btn confirm-cancel" id="confirm-cancel-btn">取消</button>
+                <button type="button" class="confirm-btn confirm-ok confirm-danger" id="confirm-ok-btn">删除</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 游戏样式 -->
     <link rel="stylesheet" href="games/word-challenge/word-challenge.css">
     <link rel="stylesheet" href="games/time-challenge/time-challenge.css">
@@ -379,6 +393,10 @@
                 footerText: "专为温蒂打造 • 充满爱的学习助手",
                 congratulationTitle: "恭喜！",
                 congratulationText: "温蒂，你太棒了！已经记住了这个单词！",
+                confirmDeleteTitle: "删除单词",
+                confirmDeleteText: "确定要把「{word}」从单词本中删除吗？删除后该单词的星级和复习记录也会一并清除。",
+                confirmDeleteOk: "删除",
+                confirmCancel: "取消",
                 voiceText: "语音设置",
                 chineseVoiceTitle: "中文语音",
                 englishVoiceTitle: "英文语音",
@@ -422,6 +440,10 @@
                 footerText: "Made for Wendy • Learning Assistant with Love",
                 congratulationTitle: "Congratulations!",
                 congratulationText: "Wendy, you're amazing! You've mastered this word!",
+                confirmDeleteTitle: "Delete Word",
+                confirmDeleteText: "Remove \"{word}\" from the wordbook? Its stars and review history will also be cleared.",
+                confirmDeleteOk: "Delete",
+                confirmCancel: "Cancel",
                 settings: {
                     avatar: "Avatar",
                     theme: "Theme",
@@ -464,6 +486,15 @@
             document.getElementById('footer-text').textContent = t.footerText;
             document.getElementById('congratulation-title').textContent = t.congratulationTitle;
             document.getElementById('congratulation-text').textContent = t.congratulationText;
+
+            // 确认弹窗（文案里含 {word} 占位符，真正打开时再替换成具体单词）
+            if (t.confirmDeleteTitle && document.getElementById('confirm-title')) {
+                document.getElementById('confirm-title').textContent = t.confirmDeleteTitle;
+                document.getElementById('confirm-text').setAttribute('data-template', t.confirmDeleteText);
+                document.getElementById('confirm-text').textContent = t.confirmDeleteText.replace('{word}', '这个单词');
+                document.getElementById('confirm-ok-btn').textContent = t.confirmDeleteOk;
+                document.getElementById('confirm-cancel-btn').textContent = t.confirmCancel;
+            }
             
             // 更新设置菜单文本
             document.getElementById('avatar-text').textContent = t.settings.avatar;

@@ -673,8 +673,12 @@ class WendyApp {
         currentWords.forEach((word, index) => {
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
+            const safeWord = String(word.english_word).replace(/"/g, '&quot;');
             wordItem.innerHTML = `
-                <div class="word-item-speak" data-word="${word.english_word}" title="朗读">
+                <div class="word-item-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
+                    <i class="fas fa-trash"></i>
+                </div>
+                <div class="word-item-speak" data-word="${safeWord}" title="朗读">
                     <i class="fas fa-volume-up"></i>
                 </div>
                 <div class="word">${word.english_word}</div>
@@ -755,6 +759,16 @@ class WendyApp {
         
         // 星星点击事件
         wordbookContainer.addEventListener('click', (e) => {
+            // 删除按钮点击事件（用 closest 兼容点到内部图标的情况）
+            if (e.target.closest('.word-item-delete')) {
+                const delBtn = e.target.closest('.word-item-delete');
+                this.deleteWordFromBook(
+                    parseInt(delBtn.getAttribute('data-word-id')),
+                    delBtn.getAttribute('data-word')
+                );
+                return;
+            }
+            
             if (e.target.classList.contains('star')) {
                 const starContainer = e.target.parentElement;
                 const wordId = parseInt(starContainer.getAttribute('data-word-id'));
@@ -769,6 +783,87 @@ class WendyApp {
                 this.speakWord(word);
             }
         });
+    }
+
+    // 通用确认弹窗，返回 Promise<boolean>
+    // 标题/按钮文案由 index.html 的 updateLanguage 按当前语言写入，
+    // 这里只需要传入具体的提示内容。
+    showConfirmDialog({ title, message, okText, cancelText, danger = false } = {}) {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('confirm-overlay');
+            // 页面里没有这个弹窗时退回浏览器原生确认框，保证功能不丢
+            if (!overlay) {
+                resolve(window.confirm(message || '确定继续吗？'));
+                return;
+            }
+            
+            const titleEl = document.getElementById('confirm-title');
+            const textEl = document.getElementById('confirm-text');
+            const okBtn = document.getElementById('confirm-ok-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            
+            if (title) titleEl.textContent = title;
+            if (message) textEl.textContent = message;
+            if (okText) okBtn.textContent = okText;
+            if (cancelText) cancelBtn.textContent = cancelText;
+            okBtn.classList.toggle('confirm-danger', !!danger);
+            
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                overlay.classList.remove('show');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                overlay.removeEventListener('click', onOverlayClick);
+                document.removeEventListener('keydown', onKeyDown);
+                resolve(result);
+            };
+            const onOk = () => finish(true);
+            const onCancel = () => finish(false);
+            const onOverlayClick = (e) => { if (e.target === overlay) finish(false); };
+            const onKeyDown = (e) => { if (e.key === 'Escape') finish(false); };
+            
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            overlay.addEventListener('click', onOverlayClick);
+            document.addEventListener('keydown', onKeyDown);
+            
+            overlay.classList.add('show');
+            // 默认聚焦「取消」，避免顺手回车就删掉
+            setTimeout(() => cancelBtn.focus(), 0);
+        });
+    }
+
+    // 从单词本删除单词
+    async deleteWordFromBook(wordId, wordText) {
+        if (!wordId) return;
+        
+        const name = wordText || '这个单词';
+        // 文案模板由 updateLanguage 写入 data-template，从而跟随中英界面语言
+        const textEl = document.getElementById('confirm-text');
+        const template = (textEl && textEl.getAttribute('data-template'))
+            || '确定要把「{word}」从单词本中删除吗？删除后该单词的星级和复习记录也会一并清除。';
+        
+        const ok = await this.showConfirmDialog({
+            message: template.replace('{word}', name),
+            danger: true
+        });
+        if (!ok) return;
+        
+        try {
+            const result = await this.api.deleteWord(wordId);
+            if (result && result.success) {
+                this.showNotification(`已删除「${name}」`, 'success');
+                // 重新加载单词本，同时刷新「我的单词」统计
+                await this.loadWordbook();
+            } else {
+                this.showNotification((result && result.error) || '删除失败', 'error');
+            }
+        } catch (error) {
+            console.error('删除单词失败:', error);
+            this.showNotification('删除失败，请重试', 'error');
+        }
     }
 
     updateMasteredWordsDisplay() {
@@ -793,8 +888,12 @@ class WendyApp {
                 ? `<div class="word-pronunciation">${word.pronunciation}</div>` 
                 : '';
             
+            const safeWord = String(word.english_word).replace(/"/g, '&quot;');
             wordDiv.innerHTML = `
-                <div class="mastered-word-speak" data-word="${word.english_word.replace(/"/g, '&quot;')}" title="朗读">
+                <div class="mastered-word-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
+                    <i class="fas fa-trash"></i>
+                </div>
+                <div class="mastered-word-speak" data-word="${safeWord}" title="朗读">
                     <i class="fas fa-volume-up"></i>
                 </div>
                 <div class="word-text">${word.english_word}</div>
@@ -802,6 +901,17 @@ class WendyApp {
                 <div class="word-meaning">${word.chinese_meaning}</div>
             `;
             masteredContainer.appendChild(wordDiv);
+        });
+        
+        // 绑定删除按钮事件
+        masteredContainer.querySelectorAll('.mastered-word-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteWordFromBook(
+                    parseInt(btn.getAttribute('data-word-id')),
+                    btn.getAttribute('data-word')
+                );
+            });
         });
         
         // 绑定发音按钮事件
@@ -814,15 +924,52 @@ class WendyApp {
         });
     }
 
-    speakWord(word) {
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.8;
-            speechSynthesis.speak(utterance);
-        } else {
-            this.showNotification('您的浏览器不支持语音朗读', 'warning');
+    // 统一的语音合成构建方法。
+    // 朗读用的语音、音量、语言都在这里决定，避免各处朗读各自实现，
+    // 导致「语音设置」里的选择（小柔、小星等）只对某一处生效。
+    createUtterance(text, { rate = 1.0, lang } = {}) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // 语言：调用方指定优先，否则按内容自动判断（含中文就用中文）
+        const hasChinese = /[\u4e00-\u9fff]/.test(text || '');
+        utterance.lang = lang || (hasChinese ? 'zh-CN' : 'en-US');
+        
+        // 音量跟随设置里的音量滑块
+        const volumeSlider = document.getElementById('volume-slider');
+        utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
+        utterance.rate = rate;
+        utterance.pitch = 1.0;
+        
+        // 语音选择：优先用户选择的（语音设置里的小柔、小星等），否则按语言自动匹配
+        const voices = speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            let selectedVoice = null;
+            if (this.selectedVoiceName) {
+                selectedVoice = voices.find(voice =>
+                    voice.name === this.selectedVoiceName &&
+                    (!this.selectedVoiceLang || voice.lang.startsWith(this.selectedVoiceLang))
+                );
+            }
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice =>
+                    hasChinese ? voice.lang.startsWith('zh') : voice.lang.startsWith('en')
+                );
+            }
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
         }
+        return utterance;
+    }
+
+    speakWord(word) {
+        if (!('speechSynthesis' in window)) {
+            this.showNotification('您的浏览器不支持语音朗读', 'warning');
+            return;
+        }
+        // 单词朗读放慢一点，方便跟读
+        this.stopSpeaking();
+        speechSynthesis.speak(this.createUtterance(word, { rate: 0.8 }));
     }
 
     // 更新单词掌握程度
@@ -1140,15 +1287,13 @@ class WendyApp {
             return;
         }
         
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            const volumeSlider = document.getElementById('volume-slider');
-            utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
-            speechSynthesis.speak(utterance);
-        } else {
+        if (!('speechSynthesis' in window)) {
             this.showNotification('您的浏览器不支持语音朗读', 'warning');
+            return;
         }
+        
+        this.stopSpeaking();
+        speechSynthesis.speak(this.createUtterance(text));
     }
     
     // 从HTML中提取纯文本（用于语音朗读）
@@ -1206,71 +1351,22 @@ class WendyApp {
             return;
         }
         
-        // 检测语言（简单判断：如果包含中文字符，使用中文语音；否则使用英文）
-        const hasChinese = /[\u4e00-\u9fa5]/.test(textToSpeak);
-        const hasEnglish = /[a-zA-Z]/.test(textToSpeak);
-        
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            
-            // 根据内容设置语言
-            if (hasChinese && hasEnglish) {
-                // 中英文混合，优先使用中文语音
-                utterance.lang = 'zh-CN';
-            } else if (hasChinese) {
-                utterance.lang = 'zh-CN';
-            } else {
-                utterance.lang = 'en-US';
-            }
-            
-            // 设置语音参数
-            const volumeSlider = document.getElementById('volume-slider');
-            utterance.volume = volumeSlider ? volumeSlider.value / 100 : 0.5;
-            utterance.rate = 0.9; // 稍微慢一点，适合学习
-            utterance.pitch = 1.0;
-            
-            // 选择语音（优先使用用户选择的语音）
-            const voices = speechSynthesis.getVoices();
-            if (voices.length > 0) {
-                let selectedVoice = null;
-                
-                // 如果用户选择了语音，优先使用
-                if (this.selectedVoiceName) {
-                    selectedVoice = voices.find(voice => 
-                        voice.name === this.selectedVoiceName && 
-                        (!this.selectedVoiceLang || voice.lang.startsWith(this.selectedVoiceLang))
-                    );
-                }
-                
-                // 如果用户选择的语音不可用，根据内容自动选择
-                if (!selectedVoice) {
-                    selectedVoice = voices.find(voice => {
-                        if (hasChinese) {
-                            return voice.lang.startsWith('zh');
-                        } else {
-                            return voice.lang.startsWith('en');
-                        }
-                    });
-                }
-                
-                if (selectedVoice) {
-                    utterance.voice = selectedVoice;
-                }
-            }
-            
-            utterance.onerror = (event) => {
-                console.error('语音朗读错误:', event);
-                this.showNotification('语音朗读失败', 'warning');
-            };
-            
-            utterance.onend = () => {
-                console.log('语音朗读完成');
-            };
-            
-            speechSynthesis.speak(utterance);
-        } else {
+        if (!('speechSynthesis' in window)) {
             this.showNotification('您的浏览器不支持语音朗读', 'warning');
+            return;
         }
+        
+        // 语音、音量、语言统一交给 createUtterance，确保和「语音设置」保持一致
+        const utterance = this.createUtterance(textToSpeak, { rate: 0.9 });
+        utterance.onerror = (event) => {
+            console.error('语音朗读错误:', event);
+            this.showNotification('语音朗读失败', 'warning');
+        };
+        utterance.onend = () => {
+            console.log('语音朗读完成');
+        };
+        
+        speechSynthesis.speak(utterance);
     }
 
     setupVoiceInputButtons() {
@@ -1328,6 +1424,15 @@ class WendyApp {
             return;
         }
         
+        // 先收干净上一次录音，避免同时存在多个 MediaRecorder
+        this.stopVoiceRecognition();
+        
+        // 本次录音会话。用于处理「按下后 getUserMedia 还没返回、用户就松手」的竞态：
+        // 旧实现里 stopVoiceRecognition() 找不到 recorder 就直接返回，
+        // 等 recorder 建好后已无人停止它，录到的内容不属于本次操作。
+        const session = { stopRequested: false, startedAt: 0 };
+        this.currentRecordingSession = session;
+        
         try {
             // 请求麦克风权限
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -1338,6 +1443,12 @@ class WendyApp {
                     noiseSuppression: true
                 }
             });
+            
+            // 等待授权期间用户已经松手 -> 放弃本次录音，不留下停不掉的录音
+            if (session.stopRequested) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
             
             // 创建MediaRecorder
             const options = {
@@ -1358,10 +1469,7 @@ class WendyApp {
             const mediaRecorder = new MediaRecorder(stream, options);
             const audioChunks = [];
             
-            // 开始录音
-            mediaRecorder.start();
-            this.showNotification('正在录音...', 'info');
-            
+            // 必须先绑定 ondataavailable 再 start()，否则可能丢数据
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     audioChunks.push(event.data);
@@ -1372,13 +1480,24 @@ class WendyApp {
                 // 停止所有音频轨道
                 stream.getTracks().forEach(track => track.stop());
                 
+                const durationMs = session.startedAt ? Date.now() - session.startedAt : 0;
+                console.log(`🎤 本次录音时长: ${durationMs} ms, 分片数: ${audioChunks.length}`);
+                
                 if (audioChunks.length === 0) {
                     this.showNotification('录音失败，请重试', 'error');
                     return;
                 }
                 
+                // 过短的音频百度会直接判为无效（err_no=3307/3310），
+                // 这里提前拦下并给出可操作的提示，而不是让后端报"音频数据不完整"
+                if (durationMs < 500) {
+                    this.showNotification('录音太短，请按住麦克风图标说完再松开', 'warning');
+                    return;
+                }
+                
                 // 合并音频数据
                 const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                console.log(`🎤 录音数据: ${audioBlob.size} 字节`);
                 
                 // 转换为WAV格式（百度API需要）
                 try {
@@ -1387,9 +1506,15 @@ class WendyApp {
                     // 发送到后端识别
                     const formData = new FormData();
                     formData.append('audio', wavBlob, 'recording.wav');
-                    formData.append('language', 'en'); // 识别英语
+                    // 识别语言跟随界面语言：中文界面识别中文（dev_pid 1537），
+                    // 英文界面识别英文（dev_pid 1737）。
+                    // 之前写死 'en'，导致说中文时被英文模型硬套成英文乱码。
+                    const speechLang = this.currentLanguage === 'en' ? 'en' : 'zh';
+                    formData.append('language', speechLang);
                     formData.append('format', 'wav');
                     formData.append('rate', '16000');
+                    // 附带客户端实测时长，服务端只记日志，便于排查录音时长异常
+                    formData.append('duration_ms', String(durationMs));
                     
                     this.showNotification('正在识别...', 'info');
                     
@@ -1412,6 +1537,11 @@ class WendyApp {
                 }
             };
             
+            // 绑定完成后再开始录音
+            mediaRecorder.start();
+            session.startedAt = Date.now();
+            this.showNotification('正在录音...', 'info');
+            
             // 保存 mediaRecorder 以便停止
             this.currentMediaRecorder = mediaRecorder;
             this.currentStream = stream;
@@ -1433,6 +1563,11 @@ class WendyApp {
     }
 
     stopVoiceRecognition() {
+        // 标记「已松手」。若此刻 recorder 还没建好（getUserMedia 仍在等待授权），
+        // startVoiceRecognition 会在拿到麦克风流后自行放弃，避免留下停不掉的录音。
+        if (this.currentRecordingSession) {
+            this.currentRecordingSession.stopRequested = true;
+        }
         if (this.currentMediaRecorder && this.currentMediaRecorder.state !== 'inactive') {
             this.currentMediaRecorder.stop();
         }
@@ -1447,27 +1582,34 @@ class WendyApp {
         // 使用Web Audio API转换为WAV格式
         const arrayBuffer = await audioBlob.arrayBuffer();
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        // 转换为16kHz单声道
-        const sampleRate = 16000;
-        const numberOfChannels = 1;
-        const length = audioBuffer.length * sampleRate / audioBuffer.sampleRate;
-        const newAudioBuffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
-        
-        // 重采样
-        const sourceData = audioBuffer.getChannelData(0);
-        const targetData = newAudioBuffer.getChannelData(0);
-        const ratio = audioBuffer.sampleRate / sampleRate;
-        
-        for (let i = 0; i < length; i++) {
-            const index = Math.floor(i * ratio);
-            targetData[i] = sourceData[index];
+        try {
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // 转换为16kHz单声道
+            const sampleRate = 16000;
+            const numberOfChannels = 1;
+            // createBuffer 需要整数长度，显式取整，不依赖隐式转换
+            const length = Math.floor(audioBuffer.length * sampleRate / audioBuffer.sampleRate);
+            const newAudioBuffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
+            
+            // 重采样
+            const sourceData = audioBuffer.getChannelData(0);
+            const targetData = newAudioBuffer.getChannelData(0);
+            const ratio = audioBuffer.sampleRate / sampleRate;
+            
+            for (let i = 0; i < length; i++) {
+                const index = Math.floor(i * ratio);
+                targetData[i] = sourceData[index];
+            }
+            
+            // 转换为WAV格式
+            const wav = this.audioBufferToWav(newAudioBuffer);
+            return new Blob([wav], { type: 'audio/wav' });
+        } finally {
+            // 及时释放 AudioContext。浏览器对同时存在的 AudioContext 数量有上限，
+            // 旧实现每次录音都新建且从不关闭，连续录若干次后创建会失败。
+            try { await audioContext.close(); } catch (e) { /* 忽略关闭异常 */ }
         }
-        
-        // 转换为WAV格式
-        const wav = this.audioBufferToWav(newAudioBuffer);
-        return new Blob([wav], { type: 'audio/wav' });
     }
 
     audioBufferToWav(buffer) {

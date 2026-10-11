@@ -605,6 +605,47 @@ body {
     transform: scale(1.1);
 }
 
+/* 单词本删除图标样式（与朗读图标对称，位于左上角，悬停才显示） */
+.word-item-delete,
+.mastered-word-delete {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    background-color: #ff6b6b;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.word-item:hover .word-item-delete,
+.mastered-word-item:hover .mastered-word-delete {
+    opacity: 1;
+}
+
+.word-item-delete:hover,
+.mastered-word-delete:hover {
+    background-color: #e03131;
+    transform: scale(1.1);
+}
+
+/* 触屏设备没有 hover，图标直接常显，否则永远点不到 */
+@media (hover: none) {
+    .word-item-delete,
+    .mastered-word-delete,
+    .word-item-speak,
+    .mastered-word-speak {
+        opacity: 1;
+    }
+}
+
 /* 分页控件样式 */
 .pagination {
     display: flex;
@@ -1209,6 +1250,116 @@ body {
     0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
     70% { transform: translate(-50%, -50%) scale(1.1); }
     100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* ===== 通用确认弹窗 ===== */
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1200;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.confirm-overlay.show {
+    display: flex;
+    animation: confirmFadeIn 0.2s ease;
+}
+
+.confirm-box {
+    background: white;
+    border-radius: 20px;
+    padding: 26px 24px 20px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    animation: confirmPopIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirm-icon {
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff8787 0%, #e03131 100%);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 22px;
+}
+
+.confirm-title {
+    margin: 0 0 8px;
+    font-size: 17px;
+    color: var(--primary);
+}
+
+.confirm-text {
+    margin: 0 0 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    word-break: break-word;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.confirm-btn {
+    flex: 1;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 0;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.confirm-cancel {
+    background: var(--secondary);
+    color: var(--text);
+}
+
+.confirm-ok {
+    background: var(--accent);
+    color: white;
+}
+
+.confirm-ok.confirm-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #e03131 100%);
+}
+
+.confirm-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+
+.confirm-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes confirmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 该弹窗由 flex 居中，动画里不能再带 translate，否则会偏移 */
+@keyframes confirmPopIn {
+    0% { transform: scale(0.85); opacity: 0; }
+    70% { transform: scale(1.03); }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes wordDetailPopIn {
