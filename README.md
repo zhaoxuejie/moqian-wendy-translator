@@ -1,5 +1,10 @@
 # 温蒂的翻译助手
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.3.3-000000.svg?logo=flask)](https://flask.palletsprojects.com/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white)](docker-deploy.md)
+
 一个专为女儿温蒂设计的个性化翻译学习应用，采用前后端分离架构，提供友好的用户体验和强大的学习功能。
 
 ## 🌟 功能特性
@@ -728,7 +733,17 @@ await wendyApp.handleAddToWordbook();
 
 ## 📄 许可证
 
-本项目为个人学习项目，仅供家庭使用。
+本项目采用 [MIT 许可证](LICENSE) 开源 —— 你可以自由使用、修改、分发，甚至用于商业用途，只需保留原始版权声明。
+
+```
+Copyright (c) 2026 moqian
+```
+
+### ⚠️ 素材说明
+
+`Frontend/img/` 下的三张头像（柯南、小丸子、哆啦A梦）为**受版权保护的动漫角色**，
+仅用于个人家庭学习场景，**不在 MIT 许可证的授权范围内**。
+若你要将此项目用于其他用途，请自行替换为原创或免版权素材。
 
 ## 💝 致谢
 
