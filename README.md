@@ -1,11 +1,18 @@
-# 温蒂的翻译助手
+<div align="center">
+  <img src="Frontend/favicon.svg" width="96" height="96" alt="温蒂的翻译助手" />
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3.3-000000.svg?logo=flask)](https://flask.palletsprojects.com/)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white)](docker-deploy.md)
+  <h1>温蒂的翻译助手</h1>
 
-一个专为女儿温蒂设计的个性化翻译学习应用，采用前后端分离架构，提供友好的用户体验和强大的学习功能。
+  <p>一个专为女儿温蒂设计的个性化翻译学习应用<br />
+  采用前后端分离架构，提供友好的用户体验和强大的学习功能</p>
+
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+    <img src="https://img.shields.io/badge/Python-3.8%2B-blue.svg" alt="Python 3.8+" />
+    <img src="https://img.shields.io/badge/Flask-2.3.3-000000.svg?logo=flask" alt="Flask" />
+    <a href="docker-deploy.md"><img src="https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&amp;logoColor=white" alt="Docker" /></a>
+  </p>
+</div>
 
 ## 🌟 功能特性
 

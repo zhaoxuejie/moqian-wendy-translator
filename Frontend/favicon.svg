@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"
+     role="img" aria-label="温蒂的翻译助手">
+  <title>温蒂的翻译助手</title>
+  <defs>
+    <linearGradient id="wendyGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff9ec9"/>
+      <stop offset="100%" stop-color="#a6e3ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角方形底 -->
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#wendyGrad)"/>
+
+  <!-- 字母 W（Wendy） -->
+  <path d="M33 44 L45 88 L64 60 L83 88 L95 44"
+        fill="none" stroke="#ffffff" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
