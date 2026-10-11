@@ -80,6 +80,11 @@ database/tts_cache/
 certs/*
 !certs/README.md
 
+# 教材词库（第三方整理的数据，无开源许可证，只在本机使用，不提交）
+# 同样用 data/wordlists/* 才能把说明文档放行
+data/wordlists/*
+!data/wordlists/README.md
+
 # IDE 和编辑器
 .vscode/
 .idea/
@@ -92,6 +97,9 @@ Thumbs.db
 # 日志文件
 *.log
 logs/
+
+# 本地开发用的 Compose 覆盖文件（把 Frontend/Backend 挂进容器做热更新）
+docker-compose.override.yml
 
 # 临时文件
 *.tmp
