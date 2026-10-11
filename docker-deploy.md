@@ -126,4 +126,6 @@ docker stats wendy-translator
 - `BAIDU_OCR_*`: 百度 OCR API
 - `FLASK_DEBUG`: 是否开启 Flask 调试模式，容器中默认为 `false`。
   调试模式会启用 Werkzeug 交互式调试器，**生产环境务必保持关闭**。
+- `TZ`: 容器时区，默认 `Asia/Shanghai`。
+  不设置时容器为 UTC，日志和 `/api/health` 返回的时间会比本地慢 8 小时。
 

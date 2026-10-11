@@ -7,6 +7,7 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    TZ=Asia/Shanghai \
     FLASK_APP=backend/core/app.py \
     FLASK_ENV=production
 

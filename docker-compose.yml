@@ -12,6 +12,8 @@ services:
       # 可选：如果需要热更新前端文件
       # - ./frontend:/app/frontend:ro
     environment:
+      # 时区：容器默认为 UTC，这里设为北京时间（日志与接口时间才与本地一致）
+      - TZ=${TZ:-Asia/Shanghai}
       # Flask 配置
       - FLASK_ENV=production
       - FLASK_APP=backend/core/app.py
