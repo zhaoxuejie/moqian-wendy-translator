@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-配置有道翻译API
+有道翻译 API 配置读取
+
+密钥不再写在本文件里，统一放在项目根目录的 .env 中（参考 .env.example）。
+本模块只负责从环境变量读取，仓库中不保存任何明文密钥。
 """
 
 # 注意：不在这里修改 sys.stdout，避免与主程序冲突
 # 编码处理由主程序统一管理
 # 如果作为独立脚本运行，会在 if __name__ == "__main__" 中处理
 
-# 优先从环境变量读取，如果没有则使用配置文件中的值
+# 密钥请配置在项目根目录的 .env 中（字段名见 .env.example）
+# 本文件只从环境变量读取，不再保存明文密钥
 import os
-YOUDAO_APP_KEY = os.getenv('YOUDAO_APPKEY') or os.getenv('YOUDAO_TRANSLATE_APPKEY') or "00c2ffd6fba5cfb5"      # 应用ID
-YOUDAO_APP_SECRET = os.getenv('YOUDAO_SECRET') or os.getenv('YOUDAO_TRANSLATE_SECRET') or "ZT0BEjPWldujDmjjsnBPEaMYkEI3C2Ks"  # 应用密钥
+YOUDAO_APP_KEY = os.getenv('YOUDAO_APPKEY') or os.getenv('YOUDAO_TRANSLATE_APPKEY') or ""
+YOUDAO_APP_SECRET = os.getenv('YOUDAO_SECRET') or os.getenv('YOUDAO_TRANSLATE_SECRET') or ""
 
 def setup_youdao_api():
     """配置有道翻译API"""
     try:
-        if YOUDAO_APP_KEY == "你的有道翻译AppKey" or YOUDAO_APP_SECRET == "你的有道翻译密钥":
-            print("❌ 请先配置API信息！")
-            print("📝 请编辑此文件，将 YOUDAO_APP_KEY 和 YOUDAO_APP_SECRET 替换为你的真实信息")
+        if not YOUDAO_APP_KEY or not YOUDAO_APP_SECRET:
+            print("❌ 未检测到有道翻译API配置！")
+            print("📝 请在项目根目录的 .env 中设置 YOUDAO_APPKEY 和 YOUDAO_SECRET（字段名参考 .env.example）")
             return False
     except UnicodeEncodeError:
-        if YOUDAO_APP_KEY == "你的有道翻译AppKey" or YOUDAO_APP_SECRET == "你的有道翻译密钥":
-            print("请先配置API信息！")
-            print("请编辑此文件，将 YOUDAO_APP_KEY 和 YOUDAO_APP_SECRET 替换为你的真实信息")
+        if not YOUDAO_APP_KEY or not YOUDAO_APP_SECRET:
+            print("未检测到有道翻译API配置！")
+            print("请在项目根目录的 .env 中设置 YOUDAO_APPKEY 和 YOUDAO_SECRET")
             return False
     
     try:

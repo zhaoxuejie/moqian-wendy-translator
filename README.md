@@ -107,20 +107,15 @@ wendy-translator/
 │       ├── test_api.py      # API测试
 │       ├── test_translation_logs.py # 翻译日志测试
 │       └── test_*.py        # 其他测试文件
-├── ⚙️ config/                # 配置文件
-│   ├── requirements.txt     # Python依赖
+├── ⚙️ config/                # 配置与启动
 │   ├── requirements.txt     # Python依赖
 │   └── start_app.py         # 启动脚本
 │                             # - 依赖检查
 │                             # - 数据库初始化
 │                             # - API配置
 │                             # - 实时日志输出
-├── 📊 report/                # 项目报告
-│   ├── 项目结构说明.md      # 项目结构文档
-│   ├── DeepSeek配置说明.md  # DeepSeek配置指南
-│   ├── CSS修复完成报告.md   # CSS修复报告
-│   ├── CSS重构完成报告.md   # CSS重构报告
-│   └── *.md                 # 其他技术报告
+├── 🔐 .env.example           # 环境变量模板（复制为 .env 后填密钥，可提交）
+├── 🔐 .env                   # 本地密钥文件（已被 .gitignore 忽略，切勿提交）
 ├── 🚀 start.bat              # 项目根目录启动脚本 (Windows)
 ├── 🚀 start.sh               # 项目根目录启动脚本 (Linux/Mac)
 └── 📖 README.md               # 项目文档
@@ -132,9 +127,36 @@ wendy-translator/
 - Python 3.8+
 - 现代浏览器 (Chrome, Firefox, Safari, Edge)
 
-### 🚀 快速启动
+### 第 1 步：配置密钥（.env）
 
-**方法一：项目根目录启动（推荐）**
+所有 API 密钥统一放在项目根目录的 `.env` 文件中，**不要写进代码，也不要提交到 Git**。
+
+```bash
+# Windows
+copy .env.example .env
+
+# Linux / Mac
+cp .env.example .env
+```
+
+然后编辑 `.env`，把占位值替换成你自己的真实密钥：
+
+| 变量 | 用途 | 获取地址 |
+|------|------|----------|
+| `TRANSLATION_SERVICE` | 翻译优先级：`youdao` 或 `baidu` | — |
+| `BAIDU_APPID` / `BAIDU_SECRET` | 百度翻译 | [百度翻译开放平台](https://fanyi-api.baidu.com/manage/developer) |
+| `YOUDAO_APPKEY` / `YOUDAO_SECRET` | 有道翻译 | [有道智云控制台](https://ai.youdao.com/console/) |
+| `DEEPSEEK_API_KEY` | AI 对话助手「小语」 | [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) |
+| `BAIDU_SPEECH_APP_ID` / `BAIDU_SPEECH_API_KEY` / `BAIDU_SPEECH_SECRET_KEY` | 百度语音识别 | [百度智能云控制台](https://console.bce.baidu.com/ai/) |
+| `BAIDU_OCR_API_KEY` / `BAIDU_OCR_SECRET_KEY` | 百度 OCR 文字识别 | 同上，可与语音识别共用 |
+
+> 💡 **只填你需要的即可。** 某项留空时对应功能会自动降级：翻译回落到模拟翻译、AI 对话不可用，不影响其他功能的正常使用。
+>
+> 💡 `.env` 已被 `.gitignore` 忽略，不会进入版本库；`.env.example` 是不含密钥的模板，可以放心提交。
+
+### 第 2 步：启动服务
+
+**方法一：一键启动（推荐）**
 
 Windows:
 ```bash
@@ -147,33 +169,27 @@ chmod +x start.sh
 ./start.sh
 ```
 
-**方法二：配置目录启动**
+脚本会自动完成：检查 Python 版本 → 安装依赖 → 初始化数据库 → 加载 `.env` → 启动后端 → 打开浏览器。
+
+**方法二：手动启动**
+
 ```bash
-cd config
-python start_app.py
+# 1. 安装依赖（建议使用虚拟环境）
+python -m venv .venv
+.venv\Scripts\activate            # Windows
+# source .venv/bin/activate       # Linux / Mac
+pip install -r Config/requirements.txt
+
+# 2. 初始化数据库
+python Backend/scripts/database_init.py
+
+# 3. 启动服务
+python Backend/core/app.py
 ```
 
-**方法三：手动启动**
+### 第 3 步：访问应用
 
-1. 安装依赖:
-```bash
-cd config
-pip install -r requirements.txt
-```
-
-2. 初始化数据库:
-```bash
-cd ../backend/scripts
-python database_init.py
-```
-
-3. 启动服务:
-```bash
-cd ../core
-python app.py
-```
-
-4. 访问应用: http://localhost:5000
+浏览器打开 http://localhost:5000
 
 ## 📱 使用指南
 
@@ -382,17 +398,24 @@ python app.py
 ## 🔧 开发说明
 
 ### DeepSeek AI配置
-1. 在 `backend/services/deepseek_config.json` 中配置API密钥：
+
+1. **API 密钥**：在项目根目录的 `.env` 中设置，不要写进代码，也不要写进 `deepseek_config.json`：
+```bash
+DEEPSEEK_API_KEY=your_deepseek_api_key
+```
+
+2. **非敏感参数**（模型、max_tokens、temperature 等）在 `Backend/services/deepseek_config.json` 中调整，该文件不含密钥、可以安全提交：
 ```json
 {
-    "api_key": "your_deepseek_api_key",
+    "api_key": "",
+    "base_url": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
     "max_tokens": 2000,
     "temperature": 0.7
 }
 ```
 
-2. 在 `backend/services/deepseek_service.py` 中自定义AI行为：
+3. 在 `Backend/services/deepseek_service.py` 中自定义AI行为：
 ```python
 # AI角色定义
 SYSTEM_PROMPT = """你是小语，温蒂的英语学习小伙伴和智能翻译助手。
@@ -489,15 +512,16 @@ await wendyApp.handleAddToWordbook();
 ### 翻译功能异常
 - 检查网络连接
 - 查看控制台错误信息
-- 验证翻译API密钥配置（百度、有道等）
-- 检查 `backend/services/` 中的配置文件
+- 检查项目根目录 `.env` 中的 `BAIDU_APPID` / `BAIDU_SECRET` / `YOUDAO_APPKEY` / `YOUDAO_SECRET` 是否填写正确（字段名对照 `.env.example`）
+- 启动日志出现 `✅ xxx API已配置（从环境变量）` 说明密钥已生效
+- 若日志显示 `未检测到翻译API配置，将使用模拟翻译`，说明 `.env` 没有被读到，请确认文件位于**项目根目录**且文件名就是 `.env`
 - **金山词霸无结果**：系统会自动切换到有道翻译，这是正常行为
 - **音标或例句缺失**：某些单词可能没有完整信息，系统会尽量补充
 - **音频播放失败**：会自动降级到Web Speech API进行语音合成
 
 ### AI对话功能异常
-- 验证DeepSeek API密钥是否正确配置
-- 检查 `backend/services/deepseek_config.json` 文件
+- 检查项目根目录 `.env` 中的 `DEEPSEEK_API_KEY` 是否已填写
+- 确认启动日志出现 `✅ DeepSeek API配置已加载`
 - 查看后端控制台的AI服务日志
 - 确认网络可以访问DeepSeek API
 

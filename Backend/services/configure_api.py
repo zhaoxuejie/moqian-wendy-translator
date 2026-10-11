@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-快速配置百度翻译API
-直接替换这个文件中的配置信息
+百度翻译 API 配置读取
+
+密钥不再写在本文件里，统一放在项目根目录的 .env 中（参考 .env.example）。
+本模块只负责从环境变量读取，仓库中不保存任何明文密钥。
 """
 
 # 注意：不在这里修改 sys.stdout，避免与主程序冲突
 # 编码处理由主程序统一管理
 # 如果作为独立脚本运行，会在 if __name__ == "__main__" 中处理
 
-# 🔧 在这里配置你的百度翻译API信息
-# 优先从环境变量读取，如果没有则使用配置文件中的值
+# 🔧 密钥请配置在项目根目录的 .env 中（字段名见 .env.example）
+# 本文件只从环境变量读取，不再保存明文密钥
 import os
-BAIDU_APPID = os.getenv('BAIDU_APPID') or os.getenv('BAIDU_TRANSLATE_APPID') or "20251126002506512"  # 替换为你的APP ID
-BAIDU_SECRET = os.getenv('BAIDU_SECRET') or os.getenv('BAIDU_TRANSLATE_SECRET') or "_i1JUTEK3Zc6a8JQhhzn"  # 替换为你的密钥
+BAIDU_APPID = os.getenv('BAIDU_APPID') or os.getenv('BAIDU_TRANSLATE_APPID') or ""
+BAIDU_SECRET = os.getenv('BAIDU_SECRET') or os.getenv('BAIDU_TRANSLATE_SECRET') or ""
 
 def setup_api():
     """配置翻译API"""
     try:
-        if BAIDU_APPID == "你的百度翻译APPID" or BAIDU_SECRET == "你的百度翻译密钥":
-            print("❌ 请先配置API信息！")
-            print("📝 请编辑此文件，将 BAIDU_APPID 和 BAIDU_SECRET 替换为你的真实信息")
+        if not BAIDU_APPID or not BAIDU_SECRET:
+            print("❌ 未检测到百度翻译API配置！")
+            print("📝 请在项目根目录的 .env 中设置 BAIDU_APPID 和 BAIDU_SECRET（字段名参考 .env.example）")
             return False
     except UnicodeEncodeError:
-        if BAIDU_APPID == "你的百度翻译APPID" or BAIDU_SECRET == "你的百度翻译密钥":
-            print("请先配置API信息！")
-            print("请编辑此文件，将 BAIDU_APPID 和 BAIDU_SECRET 替换为你的真实信息")
+        if not BAIDU_APPID or not BAIDU_SECRET:
+            print("未检测到百度翻译API配置！")
+            print("请在项目根目录的 .env 中设置 BAIDU_APPID 和 BAIDU_SECRET")
             return False
     
     try:

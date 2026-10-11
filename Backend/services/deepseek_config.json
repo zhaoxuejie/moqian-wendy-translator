@@ -1,5 +1,6 @@
 {
-  "api_key": "sk-34f38a43cd194156993c348cb8470b85",
+  "_comment": "DeepSeek 非敏感参数配置。api_key 请设置在项目根目录的 .env 的 DEEPSEEK_API_KEY 中，不要写进本文件。请勿把真实密钥提交到 Git。",
+  "api_key": "",
   "base_url": "https://api.deepseek.com/v1",
   "model": "deepseek-chat",
   "max_tokens": 2000,

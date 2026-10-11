@@ -4,16 +4,26 @@
 完整测试有道翻译API
 """
 
+import os
+from dotenv import load_dotenv
 from translation_service import translation_service
+
+# 密钥配置在项目根目录的 .env 中（参考 .env.example），不写进代码
+load_dotenv()
 
 def test_youdao_complete():
     """完整测试有道翻译"""
     print("🌐 完整测试有道翻译API")
     print("=" * 50)
     
-    # 配置有道API
-    YOUDAO_APP_KEY = "00c2ffd6fba5cfb5"
-    YOUDAO_APP_SECRET = "ZT0BEjPWldujDmjjsnBPEaMYkEI3C2Ks"
+    # 从环境变量读取有道API配置
+    YOUDAO_APP_KEY = os.getenv('YOUDAO_APPKEY') or os.getenv('YOUDAO_TRANSLATE_APPKEY') or ""
+    YOUDAO_APP_SECRET = os.getenv('YOUDAO_SECRET') or os.getenv('YOUDAO_TRANSLATE_SECRET') or ""
+    
+    if not YOUDAO_APP_KEY or not YOUDAO_APP_SECRET:
+        print("❌ 未检测到有道翻译API配置")
+        print("📝 请在项目根目录的 .env 中设置 YOUDAO_APPKEY 和 YOUDAO_SECRET")
+        return
     
     translation_service.set_youdao_config(YOUDAO_APP_KEY, YOUDAO_APP_SECRET)
     

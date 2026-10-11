@@ -4,16 +4,24 @@
 测试百度翻译API
 """
 
+import os
 import requests
 import hashlib
 import random
+from dotenv import load_dotenv
 
-# 从配置文件读取
-BAIDU_APPID = "20251126002506512"
-BAIDU_SECRET = "_i1JUTEK3Zc6a8JQhhzn"
+# 密钥配置在项目根目录的 .env 中（参考 .env.example），不写进代码
+load_dotenv()
+BAIDU_APPID = os.getenv('BAIDU_APPID') or os.getenv('BAIDU_TRANSLATE_APPID') or ""
+BAIDU_SECRET = os.getenv('BAIDU_SECRET') or os.getenv('BAIDU_TRANSLATE_SECRET') or ""
 
 def test_baidu_api():
     """直接测试百度翻译API"""
+    if not BAIDU_APPID or not BAIDU_SECRET:
+        print("❌ 未检测到百度翻译API配置")
+        print("📝 请在项目根目录的 .env 中设置 BAIDU_APPID 和 BAIDU_SECRET")
+        return
+
     print("🔍 测试百度翻译API")
     print(f"   APP ID: {BAIDU_APPID}")
     print(f"   密钥: {BAIDU_SECRET[:8]}...")
