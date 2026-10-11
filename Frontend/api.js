@@ -949,8 +949,8 @@ class WendyApp {
         currentWords.forEach((word, index) => {
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
-            // 卡片本身可点击打开详情，用 id 定位（点星星/喇叭/垃圾桶时不走这条）
-            wordItem.setAttribute('data-word-id', word.id);
+            // 卡片本身可点击打开详情，用独立属性定位（点星星/喇叭/垃圾桶时不走这条）
+            wordItem.setAttribute('data-detail-id', word.id);
             const safeWord = String(word.english_word).replace(/"/g, '&quot;');
             wordItem.innerHTML = `
                 <div class="word-item-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
@@ -1047,13 +1047,21 @@ class WendyApp {
                 return;
             }
             
+            // 星星：点中某一颗就设置星级
             if (e.target.classList.contains('star')) {
                 const starContainer = e.target.parentElement;
-                const wordId = parseInt(starContainer.getAttribute('data-word-id'));
+                const wordId = parseInt(starContainer.getAttribute('data-word-id'), 10);
                 const starIndex = Array.from(starContainer.children).indexOf(e.target);
                 this.updateWordMastery(wordId, starIndex + 1);
+                // 必须 return：否则会继续往下走，把详情弹窗也打开了
+                return;
             }
-            
+
+            // 点星星区域的空白处也不该弹详情
+            if (e.target.closest('.stars')) {
+                return;
+            }
+
             // 朗读图标点击事件
             if (e.target.closest('.word-item-speak')) {
                 const speakBtn = e.target.closest('.word-item-speak');
@@ -1062,10 +1070,12 @@ class WendyApp {
                 return;
             }
 
-            // 点卡片空白处 -> 打开单词详情
+            // 点卡片空白处 -> 打开单词详情。
+            // 卡片用的是独立的 data-detail-id，不和内部元素的 data-word-id 撞名，
+            // 免得以后有人写 querySelector('[data-word-id=...]') 抓到错误的元素。
             const card = e.target.closest('.word-item');
             if (card) {
-                const wordId = parseInt(card.getAttribute('data-word-id'), 10);
+                const wordId = parseInt(card.getAttribute('data-detail-id'), 10);
                 if (!isNaN(wordId)) {
                     this.openWordbookDetail(wordId);
                 }
@@ -1550,7 +1560,11 @@ class WendyApp {
                 if (word) {
                     word.mastery_level = masteryLevel;
                     // 更新星星显示
-                    const starsContainer = document.querySelector(`[data-word-id="${wordId}"]`);
+                    // 只更新星星区。选择器必须限定 .stars ——
+                    // 卡片里有多个元素带 data-word-id（删除按钮、星星区），
+                    // 用裸的 [data-word-id=...] 会抓到文档顺序第一个（删除按钮），
+                    // 把它的图标替换成星星。
+                    const starsContainer = document.querySelector(`.stars[data-word-id="${wordId}"]`);
                     if (starsContainer) {
                         starsContainer.innerHTML = this.getStarsHTML(masteryLevel);
                     }
