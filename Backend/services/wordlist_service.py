@@ -23,12 +23,41 @@
 """
 
 import csv
+import json
 import os
 from typing import Dict, List, Optional
 
 # CSV 里必须有的列（其余列可选）
 REQUIRED_FIELDS = ('english_word', 'chinese_meaning')
-OPTIONAL_FIELDS = ('pronunciation', 'example_sentence', 'example_translation')
+
+# 直接按列名透传到数据库的字段
+PASSTHROUGH_FIELDS = (
+    'pronunciation',
+    'part_of_speech',
+    'example_sentence',
+    'example_translation',
+    'uk_speech',
+    'us_speech',
+)
+
+# 第 2、3 条例句在 CSV 里是固定列，写库时收成一个 JSON 数组存进 more_examples，
+# 免得数据库里为它们多堆 4 个列
+EXTRA_SENTENCE_INDEXES = (2, 3)
+
+
+def _cell(row: Dict[str, str], name: str) -> str:
+    return (row.get(name) or '').strip()
+
+
+def _collect_more_examples(row: Dict[str, str]) -> str:
+    """把第 2、3 条例句收成 JSON 数组字符串"""
+    items = []
+    for index in EXTRA_SENTENCE_INDEXES:
+        en = _cell(row, 'example_sentence_%d' % index)
+        cn = _cell(row, 'example_translation_%d' % index)
+        if en:
+            items.append({'en': en, 'cn': cn})
+    return json.dumps(items, ensure_ascii=False) if items else ''
 
 
 class WordlistService:
@@ -145,9 +174,13 @@ class WordlistService:
                         continue
                     seen.add(key)
 
-                    record = {'english_word': word, 'chinese_meaning': meaning}
-                    for field in OPTIONAL_FIELDS:
-                        record[field] = (row.get(field) or '').strip()
+                    record = {
+                        'english_word': word,
+                        'chinese_meaning': meaning,
+                        'more_examples': _collect_more_examples(row),
+                    }
+                    for field in PASSTHROUGH_FIELDS:
+                        record[field] = _cell(row, field)
                     records.append(record)
 
         except Exception as exc:

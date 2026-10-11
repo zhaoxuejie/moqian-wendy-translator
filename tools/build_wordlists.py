@@ -17,9 +17,19 @@ https://github.com/kajweb/dict  （第三方整理，3673 stars）
 
 输出格式
 --------
-data/wordlists/<中文册名>.csv，UTF-8，带表头：
+data/wordlists/<中文册名>.csv，UTF-8（带 BOM），12 列：
 
-    english_word,chinese_meaning,pronunciation,example_sentence,example_translation
+    english_word, part_of_speech, chinese_meaning, pronunciation,
+    example_sentence, example_translation,          <- 例句 1
+    example_sentence_2, example_translation_2,      <- 例句 2
+    example_sentence_3, example_translation_3,      <- 例句 3
+    uk_speech, us_speech                            <- 真人发音标识
+
+示例：
+
+    morning,n,早晨；上午,英 /'mɔːnɪŋ/ 美 /'mɔrnɪŋ/,\
+    I hated those cold winter mornings.,我讨厌冬天里寒冷的早晨。,\
+    ...,...,...,...,morning&type=1,morning&type=2
 
 CSV 的**文件名（不含扩展名）就是要导入的「来源」名字**，
 所以你想改显示名字，直接重命名文件即可。
@@ -69,12 +79,42 @@ BOOKS = [
 ]
 
 CSV_HEADER = [
-    'english_word', 'chinese_meaning', 'pronunciation',
+    'english_word',
+    'part_of_speech',        # 词性，单独一列（之前拼进释义里，详情页不好展示）
+    'chinese_meaning',
+    'pronunciation',
     'example_sentence', 'example_translation',
+    'example_sentence_2', 'example_translation_2',
+    'example_sentence_3', 'example_translation_3',
+    'uk_speech', 'us_speech',  # 真人发音标识（有道 dictvoice 的参数）
 ]
+
+# 详情页放 3 条例句刚好；源数据每词通常有 4~7 条
+MAX_SENTENCES = 3
 
 # 源数据里偶尔混进来的字段名标签（不是释义内容）
 CONTENT_LABEL_RE = re.compile(r'(?:中文释义|英文释义|中释|英释)\s*[:：]\s*')
+
+# 例句列里也会混进同类标签。实测 2842 词里十几条，形如：
+#   "英文例句:Snow was falling heavily..."
+#   "英文释义：the director of education"
+#   "中文释义 他给自己倒了一杯威士忌"      <- 注意这条用空格而不是冒号
+SENTENCE_LABEL_COLON_RE = re.compile(
+    r'^\s*(?:英文例句|中文例句|英文释义|中文释义|英文翻译|中文翻译|例句|释义|翻译)\s*[:：]\s*'
+)
+# 冒号被写成空格的变体。只认「英文X / 中文X」这种明确形式，
+# 避免误伤真正以"翻译"开头的句子
+SENTENCE_LABEL_SPACE_RE = re.compile(
+    r'^\s*(?:英文例句|中文例句|英文释义|中文释义|英文翻译|中文翻译)\s+'
+)
+
+
+def clean_sentence(text):
+    """清掉例句开头的字段名标签"""
+    cleaned = (text or '').strip()
+    cleaned = SENTENCE_LABEL_COLON_RE.sub('', cleaned)
+    cleaned = SENTENCE_LABEL_SPACE_RE.sub('', cleaned)
+    return cleaned.strip()
 
 
 def log(msg):
@@ -120,10 +160,17 @@ def resolve_zip_names():
 
 # ---------------------------------------------------------------- 解析
 
-def pick_meaning(word_content):
-    """把 trans 里所有中文释义合并成一个字符串"""
+def pick_pos_and_meaning(word_content):
+    """
+    词性和释义分开取。
+
+    之前把词性拼在释义前面（"n 早晨；上午"），详情页想单独显示词性就得再拆一次，
+    不如在数据层就分开存。
+    """
     trans = word_content.get('trans') or []
-    parts = []
+    meanings = []
+    poses = []
+
     for t in trans:
         cn = (t.get('tranCn') or '').strip()
         if not cn:
@@ -135,11 +182,40 @@ def pick_meaning(word_content):
         cn = CONTENT_LABEL_RE.sub('', cn).strip()
         if not cn:
             continue
+
         pos = (t.get('pos') or '').strip()
-        text = (pos + ' ' + cn).strip() if pos else cn
-        if text not in parts:
-            parts.append(text)
-    return '；'.join(parts)
+        if pos and pos not in poses:
+            poses.append(pos)
+        if cn not in meanings:
+            meanings.append(cn)
+
+    return ' '.join(poses), '；'.join(meanings)
+
+
+def pick_sentences(word_content, limit=MAX_SENTENCES):
+    """
+    取前 limit 条例句。
+
+    返回固定长度的 (英文, 中文) 列表，不足的用空串补齐 —— 这样 CSV 的列数是固定的，
+    不会因为某个词例句少就串行。
+    """
+    sentence = word_content.get('sentence') or {}
+    sentences = sentence.get('sentences') or []
+
+    picked = []
+    for s in sentences:
+        en = clean_sentence(s.get('sContent'))
+        cn = clean_sentence(s.get('sCn'))
+        if not en:
+            continue
+        picked.append((en, cn))
+        if len(picked) >= limit:
+            break
+
+    while len(picked) < limit:
+        picked.append(('', ''))
+
+    return picked
 
 
 def pick_phonetic(word_content):
@@ -162,15 +238,8 @@ def pick_phonetic(word_content):
 
 
 def pick_sentence(word_content):
-    """取第一个例句及其翻译"""
-    sentence = word_content.get('sentence') or {}
-    sentences = sentence.get('sentences') or []
-    for s in sentences:
-        en = (s.get('sContent') or '').strip()
-        cn = (s.get('sCn') or '').strip()
-        if en:
-            return en, cn
-    return '', ''
+    """取第一个例句及其翻译（保留给旧调用，实际已改用 pick_sentences）"""
+    return pick_sentences(word_content, limit=1)[0]
 
 
 def parse_word_line(line):
@@ -205,19 +274,26 @@ def parse_word_line(line):
     if not isinstance(word_content, dict):
         word_content = {}
 
-    meaning = pick_meaning(word_content)
+    pos, meaning = pick_pos_and_meaning(word_content)
     if not meaning:
         # 没有中文释义的词对单词本没意义，跳过
         return None
 
-    en, cn = pick_sentence(word_content)
+    sentences = pick_sentences(word_content)
 
     return {
         'english_word': head_word,
+        'part_of_speech': pos,
         'chinese_meaning': meaning,
         'pronunciation': pick_phonetic(word_content),
-        'example_sentence': en,
-        'example_translation': cn,
+        'example_sentence': sentences[0][0],
+        'example_translation': sentences[0][1],
+        'example_sentence_2': sentences[1][0],
+        'example_translation_2': sentences[1][1],
+        'example_sentence_3': sentences[2][0],
+        'example_translation_3': sentences[2][1],
+        'uk_speech': (word_content.get('ukspeech') or '').strip(),
+        'us_speech': (word_content.get('usspeech') or '').strip(),
     }
 
 
@@ -295,21 +371,26 @@ def main():
         write_csv(out_path, records)
 
         with_sentence = sum(1 for r in records if r['example_sentence'])
+        multi_sentence = sum(1 for r in records if r['example_sentence_2'])
         with_phonetic = sum(1 for r in records if r['pronunciation'])
+        with_pos = sum(1 for r in records if r['part_of_speech'])
+        with_audio = sum(1 for r in records if r['us_speech'] or r['uk_speech'])
         total_words += len(records)
 
-        summary.append((out_name, len(records), with_phonetic, with_sentence))
-        log('  ✅ %d 词（音标 %d，例句 %d）-> %s.csv'
-            % (len(records), with_phonetic, with_sentence, out_name))
+        summary.append((out_name, len(records), with_pos, with_phonetic,
+                        multi_sentence, with_audio))
+        log('  ✅ %d 词（词性 %d，音标 %d，多例句 %d，真人发音 %d）-> %s.csv'
+            % (len(records), with_pos, with_phonetic, multi_sentence,
+               with_audio, out_name))
 
     log('')
-    log('=' * 62)
-    log('%-22s %7s %7s %7s' % ('册次', '词数', '有音标', '有例句'))
-    log('-' * 62)
-    for name, count, ph, se in summary:
-        log('%-22s %7d %7d %7d' % (name, count, ph, se))
-    log('-' * 62)
-    log('%-22s %7d' % ('合计', total_words))
+    log('=' * 74)
+    log('%-22s %6s %6s %6s %7s %7s' % ('册次', '词数', '有词性', '有音标', '多例句', '真人音'))
+    log('-' * 74)
+    for name, count, pos, ph, multi, audio in summary:
+        log('%-22s %6d %6d %6d %7d %7d' % (name, count, pos, ph, multi, audio))
+    log('-' * 74)
+    log('%-22s %6d' % ('合计', total_words))
     log('')
     log('✅ 完成。文件在 %s' % OUT_DIR)
     log('   记得：这个目录已在 .gitignore 里，不会被提交。')

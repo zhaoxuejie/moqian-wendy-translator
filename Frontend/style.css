@@ -711,6 +711,8 @@ body {
     position: relative;
     transition: all 0.3s ease;
     text-align: center;
+    /* 卡片可点击打开详情；星星/喇叭/垃圾桶各自独立，不受影响 */
+    cursor: pointer;
 }
 
 .word-item:hover {
@@ -2399,6 +2401,60 @@ footer {
     font-size: 13px;
     color: #666;
     line-height: 1.5;
+}
+
+/* ==================== 单词本详情弹窗 ====================
+   弹窗外壳（.word-detail-modal / -content / -header / -section 等）
+   直接复用翻译结果页那套，视觉统一、样式不重复。
+   这里只补单词本特有的「信息条 + 操作按钮」。 */
+
+/* 弹窗外壳 .word-detail-content 的 padding 是 0，
+   内边距由各 .word-detail-section 自己提供。
+   这两个块是直接子元素，必须自己补左右内边距，否则会贴边被裁。 */
+
+.wordbook-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px dashed var(--secondary);
+    font-size: 12px;
+    color: #999;
+}
+
+.wordbook-detail-stars {
+    color: #ffb703;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+.wordbook-detail-actions {
+    display: flex;
+    gap: 10px;
+    padding: 0 20px 20px;
+}
+
+.wordbook-detail-btn {
+    flex: 1;
+    border: none;
+    border-radius: 12px;
+    padding: 11px 0;
+    font-family: inherit;
+    font-size: 14px;
+    color: white;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.wordbook-detail-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 158, 201, 0.45);
+}
+
+.wordbook-detail-btn:active {
+    transform: translateY(0);
 }
 
 /* 手机端优化 */

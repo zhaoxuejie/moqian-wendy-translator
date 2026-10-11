@@ -23,7 +23,7 @@
  *          旧的缓存会在 activate 阶段被自动清掉。
  */
 
-const SW_VERSION = 'v6';
+const SW_VERSION = 'v7';
 const SHELL_CACHE = `wendy-shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `wendy-runtime-${SW_VERSION}`;
 const API_CACHE = `wendy-api-${SW_VERSION}`;
@@ -111,6 +111,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+    // 媒体请求（单词的真人发音 mp3）直接放行，不介入：
+    //   1. 音频常用 Range 请求，返回 206 部分内容，而 Cache API 不接受 206 响应
+    //   2. 这些文件数量多、体积大，缓存在 Cache Storage 里会无限增长
+    // 交给浏览器自己的 HTTP 缓存更合适。
+    if (req.destination === 'audio' || req.destination === 'video') return;
 
     // 同源：页面导航 + 静态资源 + 后端接口 —— 都是网络优先
     if (url.origin === self.location.origin) {

@@ -433,7 +433,12 @@ def get_wordbook():
             'mastery_level': word['mastery_level'],
             'review_count': word['review_count'],
             'last_reviewed': word['last_reviewed'],
-            'source': word['source'] or ''
+            # 教材导入带进来的字段，详情弹窗要用
+            'source': word['source'] or '',
+            'part_of_speech': word['part_of_speech'] or '',
+            'more_examples': word['more_examples'] or '',
+            'uk_speech': word['uk_speech'] or '',
+            'us_speech': word['us_speech'] or ''
         })
     
     # 返回当前单词本里已有的来源清单及各自词数，供前端渲染筛选下拉。
@@ -504,11 +509,13 @@ def list_wordlists():
 @handle_errors
 def import_wordlist():
     """
-    把一册教材词表整册导入单词本。
+    把一册教材词表导入单词本。
 
-    - 已存在的单词会被自动跳过（wordbook 上有 UNIQUE(user_id, english_word)），
-      所以同一册重复导入是安全的，不会产生重复词
-    - source 记录来源册次，导入后可按册筛选
+    - 已存在的单词会**更新词条内容**（词性、例句、音标、真人发音标识），
+      所以词表格式升级后重新导入一次就能刷新，不用删数据重来
+    - **刻意不覆盖** mastery_level / review_count / last_reviewed / source：
+      用户的星级和复习记录不能因为重导就丢，来源也保留第一次导入的那册
+    - 返回 imported（新增）/ updated（更新）/ total
     """
     data = request.get_json(silent=True) or {}
     username = data.get('username', 'wendy')
@@ -533,46 +540,65 @@ def import_wordlist():
 
     conn = get_db()
     try:
-        before = conn.execute(
-            'SELECT COUNT(*) FROM wordbook WHERE user_id = ?', (user['id'],)
-        ).fetchone()[0]
+        existing = {
+            (row[0] or '').strip().lower()
+            for row in conn.execute(
+                'SELECT english_word FROM wordbook WHERE user_id = ?', (user['id'],)
+            )
+        }
 
+        imported = sum(
+            1 for r in records if r['english_word'].lower() not in existing
+        )
+        updated = len(records) - imported
+
+        # upsert：新词插入，老词只更新内容字段。
+        # 注意 DO UPDATE 里没有 mastery_level / review_count / last_reviewed / source，
+        # 这是有意为之 —— 重导词表不该影响用户已有的学习进度。
         conn.executemany('''
-            INSERT OR IGNORE INTO wordbook
+            INSERT INTO wordbook
                 (user_id, english_word, chinese_meaning, pronunciation,
-                 example_sentence, example_translation, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 part_of_speech, example_sentence, example_translation,
+                 more_examples, uk_speech, us_speech, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, english_word) DO UPDATE SET
+                chinese_meaning     = excluded.chinese_meaning,
+                pronunciation       = excluded.pronunciation,
+                part_of_speech      = excluded.part_of_speech,
+                example_sentence    = excluded.example_sentence,
+                example_translation = excluded.example_translation,
+                more_examples       = excluded.more_examples,
+                uk_speech           = excluded.uk_speech,
+                us_speech           = excluded.us_speech,
+                updated_at          = CURRENT_TIMESTAMP
         ''', [
             (
                 user['id'],
                 r['english_word'],
                 r['chinese_meaning'],
                 r.get('pronunciation') or '',
+                r.get('part_of_speech') or '',
                 r.get('example_sentence') or '',
                 r.get('example_translation') or '',
+                r.get('more_examples') or '',
+                r.get('uk_speech') or '',
+                r.get('us_speech') or '',
                 pack_id
             )
             for r in records
         ])
         conn.commit()
-
-        after = conn.execute(
-            'SELECT COUNT(*) FROM wordbook WHERE user_id = ?', (user['id'],)
-        ).fetchone()[0]
     finally:
         conn.close()
 
-    imported = after - before
-    skipped = len(records) - imported
-
-    print('📚 导入词书「%s」: 新增 %d 词，跳过 %d 词（已存在）'
-          % (pack_id, imported, skipped))
+    print('📚 导入词书「%s」: 新增 %d 词，更新 %d 词'
+          % (pack_id, imported, updated))
 
     return jsonify({
         'success': True,
         'source': pack_id,
         'imported': imported,
-        'skipped': skipped,
+        'updated': updated,
         'total': len(records)
     })
 

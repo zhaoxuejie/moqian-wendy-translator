@@ -296,6 +296,10 @@ docker compose down
    （触屏设备没有悬停，图标会常显）
 6. **导入教材词书**：点右上角「导入词书」，整册导入人教版教材单词（见下方说明）
 7. **按册筛选**：单词本顶部的下拉框可以只看某一册的单词
+8. **点卡片看详情**：点单词卡片（星星 / 喇叭 / 垃圾桶以外的区域）打开详情弹窗 ——
+   词性、音标、最多 3 条例句（含中文翻译）、来源册次、星级与复习次数。
+   内容**全部来自本地数据，断网也能看**；单词朗读优先用教材数据里的真人发音，
+   取不到才回退到语音合成
 
 #### 导入教材词书
 
@@ -435,6 +439,9 @@ python tools/build_wordlists.py
 - `GET /api/wordbook` - 获取单词列表
   - 可选参数 `source` - 按教材册次筛选；传 `__none__` 表示只看手动添加的词
   - 返回里的 `sources` 列出当前各来源及词数，供前端渲染筛选下拉
+  - 每个单词还返回详情弹窗要用的字段：`part_of_speech`、
+    `more_examples`（第 2、3 条例句的 JSON 数组）、
+    `uk_speech` / `us_speech`（真人发音标识）
 - `POST /api/wordbook` - 添加新单词
 - `PUT /api/wordbook/{id}` - 更新掌握程度
 - `DELETE /api/wordbook/{id}` - 删除单词
@@ -443,11 +450,13 @@ python tools/build_wordlists.py
 ### 教材词书（导入单词本）
 - `GET /api/wordlists` - 列出可导入的教材词书
   - 每册返回 `word_count`（该册总词数）与 `in_wordbook`（已在本用户单词本里的词数）
-- `POST /api/wordbook/import` - 整册导入
+- `POST /api/wordbook/import` - 整册导入 / 刷新
   - 请求体：`{"username": "wendy", "source": "人教版-初一上册"}`
-  - 返回：`{"imported": 387, "skipped": 5, "total": 392}`
-  - 已存在的单词自动跳过（`INSERT OR IGNORE` + `UNIQUE(user_id, english_word)`），
-    可安全重复调用
+  - 返回：`{"imported": 0, "updated": 392, "total": 392}`
+  - 采用 **upsert**：新词插入，老词只更新词条内容（词性、例句、音标、真人发音标识），
+    所以词表格式升级后重导一次就能刷新数据，不用删库重来
+  - **刻意不覆盖** `mastery_level` / `review_count` / `last_reviewed` / `source`：
+    重导词表不会影响已有的星级和复习记录，来源也保留第一次导入的那册
 
 ### 学习进度
 - `GET /api/progress` - 获取学习统计
@@ -509,6 +518,11 @@ python tools/build_wordlists.py
 - `audio_url` - 单词发音音频URL（支持金山词霸和有道翻译的音频）
 - `source` - 单词来源：教材册次（如「人教版-初一上册」）；
   手动添加或翻译时收藏的词为空字符串。用于单词本按册筛选
+- `part_of_speech` - 词性（如 `n` / `adj`），从教材词表导入
+- `more_examples` - 第 2、3 条例句，JSON 数组 `[{"en": "...", "cn": "..."}]`
+  （第 1 条仍存在 `example_sentence` / `example_translation`）
+- `uk_speech` / `us_speech` - 真人发音标识（形如 `morning&type=2`），
+  前端拼成有道 `dictvoice` 链接播放
 
 ### 翻译历史 (translation_history)
 - 所有翻译记录

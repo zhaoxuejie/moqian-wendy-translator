@@ -55,23 +55,35 @@ python tools/build_wordlists.py PEPChuZhong7_1
 
 ## CSV 格式
 
-UTF-8（带 BOM，Excel 双击不乱码），首行是表头：
+UTF-8（带 BOM，Excel 双击不乱码），**12 列**，首行是表头：
 
 ```csv
-english_word,chinese_meaning,pronunciation,example_sentence,example_translation
-old,老的,英 /əʊld/ 美 /old/,a pair of old shoes,一双旧鞋
-young,年轻的,/jʌŋ/,a young child,幼儿
+english_word,part_of_speech,chinese_meaning,pronunciation,example_sentence,example_translation,example_sentence_2,example_translation_2,example_sentence_3,example_translation_3,uk_speech,us_speech
+morning,n,早晨；上午,英 /'mɔːnɪŋ/ 美 /'mɔrnɪŋ/,I hated those cold winter mornings.,我讨厌冬天里寒冷的早晨。,...,...,...,...,morning&type=1,morning&type=2
 ```
 
 | 列 | 说明 | 必填 |
 |---|---|:--:|
 | `english_word` | 英文单词 | ✅ |
+| `part_of_speech` | 词性，独立一列（`n` / `adj` / `prep`…） | |
 | `chinese_meaning` | 中文释义（多个词性用 `；` 连接） | ✅ |
 | `pronunciation` | 音标 | |
-| `example_sentence` | 例句 | |
-| `example_translation` | 例句翻译 | |
+| `example_sentence` / `example_translation` | 第 1 条例句及翻译 | |
+| `example_sentence_2` / `example_translation_2` | 第 2 条 | |
+| `example_sentence_3` / `example_translation_3` | 第 3 条 | |
+| `uk_speech` / `us_speech` | 真人发音标识，形如 `morning&type=2` | |
 
 **没有中文释义的词会被脚本自动跳过**——没有释义对背单词没意义。
+**例句不足 3 条时脚本会补空列**，保证列数固定、不会串行。
+
+`part_of_speech` 独立成一列，是因为单词详情弹窗要单独展示词性；
+早期版本把它拼在释义前面（`n 早晨；上午`），显示时还得再拆一次。
+
+导入时第 2、3 条例句会被收成 JSON 存进 `wordbook.more_examples` 一列，
+不在数据库里为它们多堆 4 个字段。
+
+> 注：人教版**小学**那 4 册的源数据里没有词性（实测 0/525），初中各册都有。
+> 小学词的词性暂时为空，不影响导入和使用。
 
 ## 来源名字怎么来的
 

@@ -499,14 +499,14 @@ class WendyApp {
 
             await this.loadWordbook();
 
-            if (result.imported > 0) {
-                let message = `已导入「${pack.id}」${result.imported} 个单词`;
-                if (result.skipped > 0) {
-                    message += `，${result.skipped} 个之前就有`;
-                }
-                this.showNotification(message, 'success');
+            const parts = [];
+            if (result.imported > 0) parts.push(`新增 ${result.imported} 个`);
+            if (result.updated > 0) parts.push(`更新 ${result.updated} 个`);
+
+            if (parts.length === 0) {
+                this.showNotification(`「${pack.id}」没有可导入的单词`, 'info');
             } else {
-                this.showNotification(`「${pack.id}」的单词都已经在单词本里了`, 'info');
+                this.showNotification(`「${pack.id}」${parts.join('，')}`, 'success');
             }
 
             // 重新拉一次列表，刷新「已在单词本 N 词」和按钮状态
@@ -949,6 +949,8 @@ class WendyApp {
         currentWords.forEach((word, index) => {
             const wordItem = document.createElement('div');
             wordItem.className = 'word-item';
+            // 卡片本身可点击打开详情，用 id 定位（点星星/喇叭/垃圾桶时不走这条）
+            wordItem.setAttribute('data-word-id', word.id);
             const safeWord = String(word.english_word).replace(/"/g, '&quot;');
             wordItem.innerHTML = `
                 <div class="word-item-delete" data-word-id="${word.id}" data-word="${safeWord}" title="从单词本删除">
@@ -1057,8 +1059,181 @@ class WendyApp {
                 const speakBtn = e.target.closest('.word-item-speak');
                 const word = speakBtn.getAttribute('data-word');
                 this.speakWord(word);
+                return;
+            }
+
+            // 点卡片空白处 -> 打开单词详情
+            const card = e.target.closest('.word-item');
+            if (card) {
+                const wordId = parseInt(card.getAttribute('data-word-id'), 10);
+                if (!isNaN(wordId)) {
+                    this.openWordbookDetail(wordId);
+                }
             }
         });
+    }
+
+    // ==================== 单词详情（纯本地数据） ====================
+    // 内容全部取自 wordbook 表，不发任何请求，所以是秒开、断网也能看。
+    // 同义词/反义词/记忆图片这些需要联网的数据留给后续的异步补全。
+
+    // 收集一个单词的例句：第 1 条在独立列，第 2、3 条在 more_examples 的 JSON 里
+    collectExamples(word) {
+        const list = [];
+
+        if (word.example_sentence) {
+            list.push({
+                en: word.example_sentence,
+                cn: word.example_translation || ''
+            });
+        }
+
+        if (word.more_examples) {
+            try {
+                const extra = JSON.parse(word.more_examples);
+                if (Array.isArray(extra)) {
+                    extra.forEach((item) => {
+                        if (item && item.en) {
+                            list.push({ en: item.en, cn: item.cn || '' });
+                        }
+                    });
+                }
+            } catch (e) {
+                // JSON 坏了不该让详情打不开，忽略即可
+                console.warn('more_examples 解析失败，已忽略:', e);
+            }
+        }
+
+        return list;
+    }
+
+    openWordbookDetail(wordId) {
+        const word = (this.wordDatabase || []).find((w) => w.id === wordId);
+        if (!word) return;
+
+        let modal = document.getElementById('wordbook-detail-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'wordbook-detail-modal';
+            modal.className = 'word-detail-modal';
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.remove('show');
+            });
+        }
+
+        const examples = this.collectExamples(word);
+        const level = word.mastery_level || 0;
+        const stars = '★'.repeat(level) + '☆'.repeat(Math.max(0, 3 - level));
+        const sourceLabel = word.source || '手动添加';
+
+        modal.innerHTML = `
+            <div class="word-detail-content">
+                <span class="word-detail-close">&times;</span>
+
+                <div class="word-detail-header">
+                    <h2 class="word-detail-word">${this.escapeHtml(word.english_word)}</h2>
+                    ${word.pronunciation ? `<div class="word-detail-pronunciation">${this.escapeHtml(word.pronunciation)}</div>` : ''}
+                    ${word.part_of_speech ? `<div class="word-detail-pos">${this.escapeHtml(word.part_of_speech)}</div>` : ''}
+                    <div class="word-detail-meaning">${this.escapeHtml(word.chinese_meaning)}</div>
+                </div>
+
+                ${examples.length > 0 ? `
+                <div class="word-detail-section">
+                    <h3 class="word-detail-section-title">例句</h3>
+                    <div class="word-detail-examples">
+                        ${examples.map((ex, index) => `
+                            <div class="word-example-item">
+                                <div class="word-example-en">
+                                    <span class="word-example-speaker" data-example-index="${index}" title="朗读这句">
+                                        <i class="fas fa-volume-up"></i>
+                                    </span>
+                                    <span>${this.escapeHtml(ex.en)}</span>
+                                </div>
+                                ${ex.cn ? `<div class="word-example-zh">${this.escapeHtml(ex.cn)}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="wordbook-detail-meta">
+                    <span><i class="fas fa-book"></i> ${this.escapeHtml(sourceLabel)}</span>
+                    <span class="wordbook-detail-stars">${stars}</span>
+                    <span>复习 ${word.review_count || 0} 次</span>
+                </div>
+
+                <div class="wordbook-detail-actions">
+                    <button type="button" class="wordbook-detail-btn" id="wb-detail-speak">
+                        <i class="fas fa-volume-up"></i> 朗读单词
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.querySelector('.word-detail-close').addEventListener('click', () => {
+            modal.classList.remove('show');
+        });
+
+        const speakBtn = modal.querySelector('#wb-detail-speak');
+        if (speakBtn) {
+            speakBtn.addEventListener('click', () => this.speakWordWithAudio(word));
+        }
+
+        // 每条例句旁边的喇叭
+        modal.querySelectorAll('.word-example-speaker').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.getAttribute('data-example-index'), 10);
+                const ex = examples[index];
+                if (ex) this.speak(ex.en);
+            });
+        });
+
+        modal.classList.add('show');
+    }
+
+    // 朗读单词：优先用教材数据里带的真人发音，拿不到再回退到原来的 TTS
+    async speakWordWithAudio(word) {
+        const audioId = (word && word.us_speech) || (word && word.uk_speech) || '';
+
+        if (!audioId) {
+            this.speakWord(word.english_word);
+            return;
+        }
+
+        this.stopSpeaking();
+
+        // audioId 形如 "morning&type=2"，词组则是 "good+morning&type=2"：
+        // `&` 前面是单词，后面是接口参数。
+        // 不能整串 encodeURIComponent —— 那会把 & 和 = 也编码掉
+        // （变成 audio=morning%26type%3D2，请求就废了）。
+        const parts = String(audioId).split('&');
+        const rawWord = parts.shift() || '';
+        // 源数据里词组用 `+` 表示空格，编码前先换回空格
+        const wordText = rawWord.replace(/\+/g, ' ');
+        const url = 'https://dict.youdao.com/dictvoice?audio='
+            + encodeURIComponent(wordText)
+            + (parts.length ? '&' + parts.join('&') : '');
+
+        try {
+            const audio = new Audio(url);
+            audio.volume = this.currentVolume();
+            this.currentAudio = audio;
+
+            // 真人发音拿不到时（网络问题 / 接口变动）不要静默失败，回退到 TTS
+            audio.addEventListener('error', () => {
+                console.warn('真人发音加载失败，回退到 TTS:', url);
+                this.speakWord(word.english_word);
+            });
+            audio.addEventListener('ended', () => {
+                if (this.currentAudio === audio) this.currentAudio = null;
+            });
+
+            await audio.play();
+        } catch (err) {
+            console.warn('真人发音播放失败，回退到 TTS:', err);
+            this.speakWord(word.english_word);
+        }
     }
 
     // 通用确认弹窗，返回 Promise<boolean>
