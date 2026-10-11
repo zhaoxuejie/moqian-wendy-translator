@@ -2235,7 +2235,8 @@ class WendyApp {
                 // 随机选择一张
                 const randomIndex = Math.floor(Math.random() * imagesToChoose.length);
                 const selectedImage = imagesToChoose[randomIndex];
-                const newImageUrl = selectedImage.webformat || selectedImage.large || selectedImage.preview;
+                // 优先 large：与后端保持一致，避免把仅有 24 小时有效期的 webformatURL 存入数据库
+                const newImageUrl = selectedImage.large || selectedImage.webformat || selectedImage.preview;
                 
                 if (newImageUrl) {
                     // 更新显示的图片

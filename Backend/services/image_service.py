@@ -100,7 +100,11 @@ class ImageService:
                 if hits:
                     # 返回第一张图片（质量最好）
                     first_image = hits[0]
-                    image_url = first_image.get('webformatURL', '')  # 中等尺寸
+                    # 主图优先使用 largeImageURL：
+                    # Pixabay 文档中 webformatURL 标注「有效期 24 小时」，而该 URL 会被
+                    # 存入数据库长期复用，用 24 小时有效的地址会导致隔天图片失效。
+                    # largeImageURL（最大 1280px）没有此限制；缺失时再回退到 webformatURL。
+                    image_url = first_image.get('largeImageURL') or first_image.get('webformatURL', '')
                     large_image_url = first_image.get('largeImageURL', '')  # 大尺寸
                     preview_url = first_image.get('previewURL', '')  # 预览图
                     
